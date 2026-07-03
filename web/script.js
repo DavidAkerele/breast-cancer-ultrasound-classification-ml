@@ -2,10 +2,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // UI Panels & Inputs
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
+    const dropzoneContent = document.getElementById('dropzoneContent');
+    const dropzonePreview = document.getElementById('dropzonePreview');
+    const dropzonePreviewImg = document.getElementById('dropzonePreviewImg');
+    const previewFilename = document.getElementById('previewFilename');
+    const previewFilesize = document.getElementById('previewFilesize');
+    const btnRemovePreview = document.getElementById('btnRemovePreview');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const claheToggle = document.getElementById('claheToggle');
     const modelSelect = document.getElementById('modelSelect');
     const existingStudySelect = document.getElementById('existingStudySelect');
+    const datasetSplitSelect = document.getElementById('datasetSplitSelect');
 
     const emptyState = document.getElementById('emptyState');
     const loadingState = document.getElementById('loadingState');
@@ -32,8 +39,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // Modes & Code Viewer Elements
     const btnUiMode = document.getElementById('btnUiMode');
     const btnCodeMode = document.getElementById('btnCodeMode');
+    const btnNoiseMode = document.getElementById('btnNoiseMode');
     const uiDashboardContainer = document.getElementById('uiDashboardContainer');
     const notebookContainer = document.getElementById('notebookContainer');
+    const noiseCompareContainer = document.getElementById('noiseCompareContainer');
+    
+    // Noise Comparison Panel Elements
+    const noiseCleanImg = document.getElementById('noiseCleanImg');
+    const noiseCleanPlaceholder = document.getElementById('noiseCleanPlaceholder');
+    const noiseCleanVerdict = document.getElementById('noiseCleanVerdict');
+    const noiseCleanConfidence = document.getElementById('noiseCleanConfidence');
+    const noiseCleanBanner = document.getElementById('noiseCleanBanner');
+    
+    const noiseCorruptedImg = document.getElementById('noiseCorruptedImg');
+    const noiseCorruptedPlaceholder = document.getElementById('noiseCorruptedPlaceholder');
+    const noiseCorruptedVerdict = document.getElementById('noiseCorruptedVerdict');
+    const noiseCorruptedConfidence = document.getElementById('noiseCorruptedConfidence');
+    const noiseCorruptedBanner = document.getElementById('noiseCorruptedBanner');
+    
+    const btnRunNoiseCompare = document.getElementById('btnRunNoiseCompare');
+    const noiseCompareType = document.getElementById('noiseCompareType');
+    const noiseCompareSeverity = document.getElementById('noiseCompareSeverity');
+    const noiseExplanationText = document.getElementById('noiseExplanationText');
     const activeFileName = document.getElementById('activeFileName');
     const btnCopyCode = document.getElementById('btnCopyCode');
     const btnRunAllCells = document.getElementById('btnRunAllCells');
@@ -70,6 +97,45 @@ document.addEventListener('DOMContentLoaded', () => {
         logConsole.scrollTop = logConsole.scrollHeight;
     }
 
+    // --- Dedicated Alert Modal System ---
+    const alertModalOverlay = document.getElementById('alertModalOverlay');
+    const alertModal = document.getElementById('alertModal');
+    const alertModalTitle = document.getElementById('alertModalTitle');
+    const alertModalMessage = document.getElementById('alertModalMessage');
+    const alertModalDismiss = document.getElementById('alertModalDismiss');
+
+    /**
+     * Show the dedicated alert modal.
+     * @param {string} title - The alert heading text.
+     * @param {string} message - The alert body description.
+     * @param {'error'|'warning'|'info'|'success'} type - Visual style of the alert.
+     */
+    function showAlertModal(title, message, type = 'error') {
+        if (!alertModalOverlay || !alertModal) return;
+
+        // Reset type classes
+        alertModal.className = 'alert-modal';
+        if (type === 'warning') alertModal.classList.add('alert-warning');
+        else if (type === 'info') alertModal.classList.add('alert-info');
+        else if (type === 'success') alertModal.classList.add('alert-success');
+        // 'error' uses the default (no extra class)
+
+        if (alertModalTitle) alertModalTitle.textContent = title;
+        if (alertModalMessage) alertModalMessage.textContent = message;
+        alertModalOverlay.classList.add('visible');
+    }
+
+    function hideAlertModal() {
+        if (alertModalOverlay) alertModalOverlay.classList.remove('visible');
+    }
+
+    if (alertModalDismiss) alertModalDismiss.addEventListener('click', hideAlertModal);
+    if (alertModalOverlay) {
+        alertModalOverlay.addEventListener('click', (e) => {
+            if (e.target === alertModalOverlay) hideAlertModal();
+        });
+    }
+
     addLogEntry('OncoVision Clinical Control Center initialized.', 'success');
     addLogEntry('Awaiting network status handshake...', 'info');
 
@@ -79,38 +145,177 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE}/health`);
             if (response.ok) {
                 const data = await response.json();
-                deviceIndicator.textContent = data.device.toUpperCase();
+                if (deviceIndicator) deviceIndicator.textContent = data.device.toUpperCase();
                 addLogEntry(`Connection established. Device: ${data.device.toUpperCase()}. Classes: ${data.classes.join(', ')}`, 'success');
             } else {
                 throw new Error();
             }
         } catch (e) {
             addLogEntry('FastAPI Backend connection failed. Running in demo simulation mode.', 'warning');
-            deviceIndicator.textContent = 'CPU (MOCK)';
+            if (deviceIndicator) deviceIndicator.textContent = 'CPU (MOCK)';
         }
     }
     fetchServerStatus();
 
-    // Fetch and populate existing patient files from validation dataset
-    async function fetchDatasetFiles() {
+    // Gallery elements
+    const galleryGrid = document.getElementById('galleryGrid');
+    const galleryCount = document.getElementById('galleryCount');
+
+    // Fetch and populate existing patient files + image gallery
+    async function fetchDatasetFiles(split = 'val') {
         try {
-            const response = await fetch(`${API_BASE}/api/dataset/files`);
+            const response = await fetch(`${API_BASE}/api/dataset/files?split=${split}`);
             if (response.ok) {
                 const data = await response.json();
-                existingStudySelect.innerHTML = '<option value="" selected>-- Select from validation dataset --</option>';
+
+                // Populate dropdown
+                existingStudySelect.innerHTML = '<option value="" selected>-- Choose patient study --</option>';
                 data.forEach(item => {
                     const option = document.createElement('option');
                     option.value = item.url;
                     option.textContent = `${item.name} (${item.class.toUpperCase()})`;
                     existingStudySelect.appendChild(option);
                 });
-                addLogEntry(`Loaded ${data.length} clinical files from validation database.`, 'success');
+
+                // Populate image gallery
+                if (galleryGrid) {
+                    galleryGrid.innerHTML = '';
+                    if (data.length === 0) {
+                        galleryGrid.innerHTML = '<div class="gallery-empty"><p>No scans found in this split.</p></div>';
+                    } else {
+                        data.forEach(item => {
+                            const card = document.createElement('div');
+                            card.className = 'gallery-item';
+                            card.dataset.url = item.url;
+                            card.innerHTML = `
+                                <img src="${API_BASE}${item.url}" alt="${item.name}" loading="lazy">
+                                <span class="gallery-badge ${item.class}">${item.class}</span>
+                            `;
+                            card.addEventListener('click', () => {
+                                // Select this image
+                                existingStudySelect.value = item.url;
+                                existingStudySelect.dispatchEvent(new Event('change'));
+                                // Highlight active card
+                                galleryGrid.querySelectorAll('.gallery-item').forEach(el => el.classList.remove('active'));
+                                card.classList.add('active');
+                            });
+                            galleryGrid.appendChild(card);
+                        });
+                    }
+                }
+                if (galleryCount) galleryCount.textContent = `${data.length} scans`;
+
+                addLogEntry(`Loaded ${data.length} files from ${split} split database.`, 'success');
             }
         } catch (e) {
-            addLogEntry('Failed to fetch validation dataset index.', 'warning');
+            addLogEntry(`Failed to fetch ${split} dataset index.`, 'warning');
         }
     }
-    fetchDatasetFiles();
+    
+    // Initial fetch
+    const initialSplit = datasetSplitSelect ? datasetSplitSelect.value : 'val';
+    fetchDatasetFiles(initialSplit);
+
+    // Fetch new dataset split files when selection changes
+    if (datasetSplitSelect) {
+        datasetSplitSelect.addEventListener('change', (e) => {
+            const split = e.target.value;
+            fetchDatasetFiles(split);
+            selectedFile = null;
+            selectedFiles = [];
+            analyzeBtn.disabled = true;
+            existingStudySelect.value = '';
+            showState('empty');
+        });
+    }
+
+    // Segmented tab controls interaction
+    const segmentBtns = document.querySelectorAll('#datasetSplitTabs .segment-btn');
+    segmentBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            segmentBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const val = btn.getAttribute('data-value');
+            if (datasetSplitSelect) {
+                datasetSplitSelect.value = val;
+                datasetSplitSelect.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+
+    // Architecture explainer data & dynamics
+    const architectureData = {
+        'CUSTOM_CNN': {
+            name: 'Custom 4-Block CNN',
+            badge: 'Convolutional Baseline',
+            params: '1.2M Params',
+            desc: 'A custom Convolutional Neural Network built specifically for this dataset. Composed of 4 successive Conv2D blocks with Batch Normalization and ReLU activations to learn localized low-level ultrasound texture patterns.',
+            rationale: 'Acts as a clinical control baseline to evaluate the performance improvement of transfer learning models.'
+        },
+        'RESNET50': {
+            name: 'ResNet-50 Fine-tuned',
+            badge: 'Deep Residual Network',
+            params: '23.5M Params',
+            desc: 'A 50-layer deep residual network fine-tuned using pre-trained ImageNet features. Utilizes skip connections (residual blocks) to bypass layers, resolving the vanishing gradient problem and allowing very high classification boundary convergence.',
+            rationale: 'Excellent for extracting abstract edge patterns, acoustic shadows, and tissue density boundaries from ultrasound scans.'
+        },
+        'EFFICIENTNET_B0': {
+            name: 'EfficientNet-B0 Backbone',
+            badge: 'Compound Scaled Net',
+            params: '4.0M Params',
+            desc: 'An optimized backbone compound-scaled across depth, width, and resolution using neural architecture search (NAS). Implements mobile inverted bottlenecks (MBConv) for compute-efficient, high-accuracy classification.',
+            rationale: 'Provides high AUC scores with faster execution, ideal for resource-constrained clinical edge deployments.'
+        }
+    };
+
+    function updateArchitectureExplainer(modelKey) {
+        const data = architectureData[modelKey.toUpperCase()];
+        if (!data) return;
+        
+        const badge = document.getElementById('explainerBadge');
+        const name = document.getElementById('explainerName');
+        const desc = document.getElementById('explainerDesc');
+        const rationale = document.getElementById('explainerRationale');
+        const params = document.getElementById('explainerParams');
+        
+        if (badge) badge.textContent = data.badge;
+        if (name) name.textContent = data.name;
+        if (desc) desc.textContent = data.desc;
+        if (rationale) rationale.textContent = data.rationale;
+        if (params) params.textContent = data.params;
+    }
+
+    function resetDiagnosticOutcomes() {
+        const clahePlaceholder = document.getElementById('clahePlaceholder');
+        if (claheImgPreview) {
+            claheImgPreview.src = '';
+            claheImgPreview.classList.add('hidden');
+        }
+        if (clahePlaceholder) {
+            clahePlaceholder.classList.remove('hidden');
+        }
+
+        if (verdictTitle) {
+            verdictTitle.textContent = 'Pending diagnostic execution';
+            verdictTitle.style.fontSize = '1.05rem';
+        }
+        if (verdictConfidence) {
+            verdictConfidence.textContent = 'Awaiting analysis';
+        }
+        if (verdictBanner) {
+            verdictBanner.className = 'verdict-banner pending';
+        }
+
+        const clinicalBirads = document.getElementById('clinicalBirads');
+        const clinicalDensity = document.getElementById('clinicalDensity');
+        const clinicalShadowing = document.getElementById('clinicalShadowing');
+        const clinicalSummaryText = document.getElementById('clinicalSummaryText');
+
+        if (clinicalBirads) clinicalBirads.textContent = 'Awaiting execution...';
+        if (clinicalDensity) clinicalDensity.textContent = 'Awaiting execution...';
+        if (clinicalShadowing) clinicalShadowing.textContent = 'Awaiting execution...';
+        if (clinicalSummaryText) clinicalSummaryText.textContent = 'Awaiting feature evaluation...';
+    }
 
     // Handle existing study dropdown selection
     existingStudySelect.addEventListener('change', (e) => {
@@ -120,6 +325,8 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedFiles = [];
             analyzeBtn.disabled = true;
             showState('empty');
+            // Clear gallery active state
+            if (galleryGrid) galleryGrid.querySelectorAll('.gallery-item').forEach(el => el.classList.remove('active'));
             return;
         }
 
@@ -129,22 +336,56 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Extract filename for UI display
         const filename = url.substring(url.lastIndexOf('/') + 1);
-        dropzone.querySelector('h3').textContent = filename;
-        dropzone.querySelector('p').textContent = 'Selected from validation database';
+        const h3 = dropzone ? dropzone.querySelector('h3') : null;
+        const p = dropzone ? dropzone.querySelector('p') : null;
+        if (h3) h3.textContent = filename;
+        if (p) {
+            const split = datasetSplitSelect ? datasetSplitSelect.value : 'validation';
+            p.textContent = `Selected from ${split} database`;
+        }
+
+        // Sync gallery active state
+        if (galleryGrid) {
+            galleryGrid.querySelectorAll('.gallery-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.url === url);
+            });
+        }
         
         // Set original preview image source directly from server path
-        origImgPreview.src = `${API_BASE}${url}`;
-        analyzeBtn.disabled = false;
+        if (origImgPreview) origImgPreview.src = `${API_BASE}${url}`;
+        if (analyzeBtn) analyzeBtn.disabled = false;
         
         addLogEntry(`Selected validation study: ${filename}`, 'info');
         showState('results'); 
-        claheImgPreview.src = ''; 
+        resetDiagnosticOutcomes();
+    });
+
+    // Bind clickable cards for Target Architecture Selector
+    const archCards = document.querySelectorAll('.arch-card');
+    archCards.forEach(card => {
+        card.addEventListener('click', () => {
+            archCards.forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            
+            if (modelSelect) {
+                modelSelect.value = card.dataset.value;
+                modelSelect.dispatchEvent(new Event('change'));
+            }
+        });
     });
 
     // Model selector updates
     modelSelect.addEventListener('change', (e) => {
         const val = e.target.value.toUpperCase();
         addLogEntry(`Target model updated: ${val}`, 'info');
+        updateArchitectureExplainer(e.target.value);
+        
+        // Sync active class on cards if dropdown is changed programmatically
+        if (archCards) {
+            archCards.forEach(c => {
+                c.classList.toggle('active', c.dataset.value === e.target.value);
+            });
+        }
     });
 
     // Clear logs handler
@@ -186,41 +427,87 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFileSelect(files) {
         existingStudySelect.value = ''; // Reset dropdown selection
         
+        // Hide preview by default
+        if (dropzoneContent) dropzoneContent.classList.remove('hidden');
+        if (dropzonePreview) dropzonePreview.classList.add('hidden');
+        
         if (files.length > 1) {
             selectedFiles = Array.from(files);
             selectedFile = null;
             
-            dropzone.querySelector('h3').textContent = `Batch: ${selectedFiles.length} Scans Loaded`;
-            dropzone.querySelector('p').textContent = 'Ready for batch dataset evaluation';
-            analyzeBtn.disabled = false;
+            const h3 = dropzone ? dropzone.querySelector('h3') : null;
+            const p = dropzone ? dropzone.querySelector('p') : null;
+            if (h3) h3.textContent = `Batch: ${selectedFiles.length} Scans Loaded`;
+            if (p) p.textContent = 'Ready for batch dataset evaluation';
+            if (analyzeBtn) analyzeBtn.disabled = false;
             addLogEntry(`Dataset batch loaded: ${selectedFiles.length} images ready.`, 'info');
         } else {
             const file = files[0];
             if (!file.type.startsWith('image/')) {
                 addLogEntry(`File rejection: Unsupported file format.`, 'error');
-                alert('Please select a valid image file (PNG, JPEG, TIFF).');
+                showAlertModal('Invalid File Format', 'Please select a valid image file (PNG, JPEG, TIFF).', 'warning');
                 return;
             }
             selectedFile = file;
             selectedFiles = [];
             
-            dropzone.querySelector('h3').textContent = file.name;
-            dropzone.querySelector('p').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB • Ready for analysis`;
-            analyzeBtn.disabled = false;
-            addLogEntry(`Mammogram study selected: ${file.name}`, 'info');
+            // Read file and generate thumbnail preview in dropzone
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (dropzonePreviewImg) dropzonePreviewImg.src = e.target.result;
+                if (previewFilename) previewFilename.textContent = file.name;
+                if (previewFilesize) previewFilesize.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB • Ready`;
+                
+                if (dropzoneContent) dropzoneContent.classList.add('hidden');
+                if (dropzonePreview) dropzonePreview.classList.remove('hidden');
+                
+                // Set the main visualizer preview & show results frame with pending diagnostics
+                if (origImgPreview) origImgPreview.src = e.target.result;
+                showState('results');
+                resetDiagnosticOutcomes();
+            };
+            reader.readAsDataURL(file);
+            
+            if (analyzeBtn) analyzeBtn.disabled = false;
+            addLogEntry(`Ultrasound study selected: ${file.name}`, 'info');
         }
+    }
+
+    // Handle preview removal
+    if (btnRemovePreview) {
+        btnRemovePreview.addEventListener('click', (e) => {
+            e.stopPropagation(); // Avoid triggering dropzone container clicks
+            fileInput.value = '';
+            selectedFile = null;
+            selectedFiles = [];
+            
+            if (dropzonePreview) dropzonePreview.classList.add('hidden');
+            if (dropzoneContent) {
+                dropzoneContent.classList.remove('hidden');
+                const h3 = dropzoneContent.querySelector('h3');
+                const p = dropzoneContent.querySelector('p');
+                if (h3) h3.textContent = 'Drag & Drop Ultrasound Study';
+                if (p) p.textContent = 'Supports standard medical PNG/JPG studies';
+            }
+            
+            if (analyzeBtn) analyzeBtn.disabled = true;
+            showState('empty');
+            addLogEntry('Selected ultrasound study removed.', 'info');
+        });
     }
 
     // Benchmark sample loaders (Represent Use Cases / Preloaded cases)
     document.querySelectorAll('.sample-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const type = btn.getAttribute('data-type');
-            dropzone.querySelector('h3').textContent = `Benchmark Case: ${type.toUpperCase()}`;
-            dropzone.querySelector('p').textContent = `Preloaded medical study use-case`;
+            const h3 = dropzone ? dropzone.querySelector('h3') : null;
+            const p = dropzone ? dropzone.querySelector('p') : null;
+            if (h3) h3.textContent = `Benchmark Case: ${type.toUpperCase()}`;
+            if (p) p.textContent = `Preloaded medical study use-case`;
             selectedFile = null; 
             selectedFiles = [];
-            existingStudySelect.value = '';
-            analyzeBtn.disabled = false;
+            if (existingStudySelect) existingStudySelect.value = '';
+            if (analyzeBtn) analyzeBtn.disabled = false;
             addLogEntry(`Loaded clinical benchmark study use-case: ${type.toUpperCase()}`, 'info');
             analyzeSample(type);
         });
@@ -249,7 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showState('empty');
             }
         } else {
-            const isBenign = dropzone.querySelector('h3').textContent.includes('BENIGN');
+            const h3 = dropzone ? dropzone.querySelector('h3') : null;
+            const isBenign = h3 ? h3.textContent.includes('BENIGN') : false;
             analyzeSample(isBenign ? 'benign' : 'malignant');
         }
     });
@@ -270,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const err = await response.json();
-                throw new Error(err.detail || 'Failed to process mammogram');
+                throw new Error(err.detail || 'Failed to process ultrasound scan');
             }
 
             const data = await response.json();
@@ -282,7 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderResults(data);
         } catch (error) {
             addLogEntry(`Analysis failed: ${error.message}`, 'error');
-            alert(`Analysis Error: ${error.message}`);
+            showAlertModal('Analysis Error', error.message, 'error');
             showState('empty');
         }
     }
@@ -317,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderBatchResults(data.results);
         } catch (error) {
             addLogEntry(`Batch analysis failed: ${error.message}`, 'error');
-            alert(`Batch Analysis Error: ${error.message}`);
+            showAlertModal('Batch Analysis Error', error.message, 'error');
             showState('empty');
         }
     }
@@ -344,34 +632,126 @@ document.addEventListener('DOMContentLoaded', () => {
                 confidence: conf,
                 probabilities: { benign: bProb, malignant: mProb },
                 original_image: dummySvg,
-                processed_image: dummySvg
+                processed_image: dummySvg,
+                noise_analysis: {
+                    dominant_type: "Speckle Noise (Acoustic)",
+                    description: "Simulated standard acoustic speckling typically seen in clinical breast ultrasound imaging.",
+                    metrics: {
+                        speckle_level: 32.5,
+                        gaussian_level: 12.4,
+                        impulse_level: 1.2,
+                        snr_db: 22.40
+                    }
+                }
             });
         }, 800);
     }
 
+    function renderNoiseAnalysis(noiseData) {
+        const noiseContentEmpty = document.getElementById('noiseContentEmpty');
+        const noiseContentResults = document.getElementById('noiseContentResults');
+        const dominantNoiseType = document.getElementById('dominantNoiseType');
+        const dominantNoiseDesc = document.getElementById('dominantNoiseDesc');
+        const speckleLevelVal = document.getElementById('speckleLevelVal');
+        const speckleLevelBar = document.getElementById('speckleLevelBar');
+        const gaussianLevelVal = document.getElementById('gaussianLevelVal');
+        const gaussianLevelBar = document.getElementById('gaussianLevelBar');
+        const impulseLevelVal = document.getElementById('impulseLevelVal');
+        const impulseLevelBar = document.getElementById('impulseLevelBar');
+        const snrValue = document.getElementById('snrValue');
+
+        if (!noiseData) {
+            if (noiseContentEmpty) noiseContentEmpty.classList.remove('hidden');
+            if (noiseContentResults) noiseContentResults.classList.add('hidden');
+            return;
+        }
+
+        if (noiseContentEmpty) noiseContentEmpty.classList.add('hidden');
+        if (noiseContentResults) noiseContentResults.classList.remove('hidden');
+
+        if (dominantNoiseType) dominantNoiseType.textContent = noiseData.dominant_type;
+        if (dominantNoiseDesc) dominantNoiseDesc.textContent = noiseData.description;
+        
+        const speckle = Math.round(noiseData.metrics.speckle_level);
+        const gaussian = Math.round(noiseData.metrics.gaussian_level);
+        const impulse = Math.round(noiseData.metrics.impulse_level);
+        
+        if (speckleLevelVal) speckleLevelVal.textContent = `${speckle}%`;
+        if (gaussianLevelVal) gaussianLevelVal.textContent = `${gaussian}%`;
+        if (impulseLevelVal) impulseLevelVal.textContent = `${impulse}%`;
+        
+        setTimeout(() => {
+            if (speckleLevelBar) speckleLevelBar.style.width = `${speckle}%`;
+            if (gaussianLevelBar) gaussianLevelBar.style.width = `${gaussian}%`;
+            if (impulseLevelBar) impulseLevelBar.style.width = `${impulse}%`;
+        }, 100);
+
+        if (snrValue) snrValue.textContent = `${noiseData.metrics.snr_db} dB`;
+    }
+
     function renderResults(data) {
-        origImgPreview.src = data.original_image;
-        claheImgPreview.src = data.processed_image;
+        if (origImgPreview) origImgPreview.src = data.original_image;
+        if (claheImgPreview) {
+            claheImgPreview.src = data.processed_image;
+            claheImgPreview.classList.remove('hidden');
+        }
+        const clahePlaceholder = document.getElementById('clahePlaceholder');
+        if (clahePlaceholder) {
+            clahePlaceholder.classList.add('hidden');
+        }
 
-        verdictTitle.textContent = data.prediction;
-        verdictConfidence.textContent = `${data.confidence}% Confidence`;
+        if (verdictTitle) {
+            verdictTitle.textContent = data.prediction;
+            verdictTitle.style.fontSize = '1.2rem';
+        }
+        if (verdictConfidence) verdictConfidence.textContent = `${data.confidence}% Confidence`;
 
-        if (data.prediction === 'MALIGNANT') {
-            verdictBanner.classList.add('malignant');
-        } else {
-            verdictBanner.classList.remove('malignant');
+        if (verdictBanner) {
+            verdictBanner.classList.remove('pending');
+            if (data.prediction === 'MALIGNANT') {
+                verdictBanner.classList.add('malignant');
+            } else {
+                verdictBanner.classList.remove('malignant');
+            }
         }
 
         const bProb = data.probabilities.benign || 0;
         const mProb = data.probabilities.malignant || 0;
 
-        benignProbVal.textContent = `${bProb}%`;
-        malignantProbVal.textContent = `${mProb}%`;
+        if (benignProbVal) benignProbVal.textContent = `${bProb}%`;
+        if (malignantProbVal) malignantProbVal.textContent = `${mProb}%`;
 
         setTimeout(() => {
-            benignProbBar.style.width = `${bProb}%`;
-            malignantProbBar.style.width = `${mProb}%`;
+            if (benignProbBar) benignProbBar.style.width = `${bProb}%`;
+            if (malignantProbBar) malignantProbBar.style.width = `${mProb}%`;
         }, 100);
+
+        // Populate Clinical Diagnostic Insights card dynamically
+        const clinicalBirads = document.getElementById('clinicalBirads');
+        const clinicalDensity = document.getElementById('clinicalDensity');
+        const clinicalShadowing = document.getElementById('clinicalShadowing');
+        const clinicalSummaryText = document.getElementById('clinicalSummaryText');
+
+        if (data.prediction === 'MALIGNANT') {
+            const biradsCat = data.confidence > 90 ? 'Category 5 - Highly Suggestive of Malignancy' : 'Category 4B - Suspicious Abnormality';
+            if (clinicalBirads) clinicalBirads.textContent = biradsCat;
+            if (clinicalDensity) clinicalDensity.textContent = 'Spiculated / Microlobulated Margins';
+            if (clinicalShadowing) clinicalShadowing.textContent = 'Posterior Acoustic Shadowing detected. Suggestive of high-density solid tumor attenuation. Core needle biopsy recommended.';
+            if (clinicalSummaryText) {
+                clinicalSummaryText.textContent = `The neural network identified an irregular mass with non-circumscribed margins and distinct posterior shadowing (acoustic attenuation). These features indicate a high-density, attenuating tissue mass, suggesting a malignant pathology.`;
+            }
+        } else {
+            const biradsCat = data.confidence > 85 ? 'Category 2 - Benign Finding' : 'Category 3 - Probably Benign';
+            if (clinicalBirads) clinicalBirads.textContent = biradsCat;
+            if (clinicalDensity) clinicalDensity.textContent = 'Circumscribed / Smooth Margins';
+            if (clinicalShadowing) clinicalShadowing.textContent = 'Posterior Acoustic Enhancement observed. Indicative of high transmission fluid-filled cyst or benign fibroadenoma.';
+            if (clinicalSummaryText) {
+                clinicalSummaryText.textContent = `The neural network identified a well-circumscribed oval mass with smooth margins and posterior acoustic enhancement (high sound transmission). These features represent a low-attenuation fluid-filled cyst or benign fibroadenoma, suggesting a benign pathology.`;
+            }
+        }
+
+        // Render noise analysis
+        renderNoiseAnalysis(data.noise_analysis);
 
         showState('results');
     }
@@ -393,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 tr.style.cursor = 'pointer';
                 tr.addEventListener('click', () => {
-                    alert(`Scope Warning:\n${res.error}`);
+                    showAlertModal('Scope Warning', res.error, 'warning');
                 });
                 tbody.appendChild(tr);
                 return;
@@ -422,16 +802,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         malignant: isBenign ? (100 - res.confidence).toFixed(2) : res.confidence
                     },
                     original_image: res.original_image,
-                    processed_image: res.processed_image
+                    processed_image: res.processed_image,
+                    noise_analysis: res.noise_analysis
                 });
             });
 
             tbody.appendChild(tr);
         });
 
-        document.getElementById('batchTotalCount').textContent = results.length;
-        document.getElementById('batchBenignCount').textContent = benignCount;
-        document.getElementById('batchMalignantCount').textContent = malignantCount;
+        const batchTotal = document.getElementById('batchTotalCount');
+        const batchBenign = document.getElementById('batchBenignCount');
+        const batchMalignant = document.getElementById('batchMalignantCount');
+        if (batchTotal) batchTotal.textContent = results.length;
+        if (batchBenign) batchBenign.textContent = benignCount;
+        if (batchMalignant) batchMalignant.textContent = malignantCount;
 
         showState('batch');
     }
@@ -452,16 +836,22 @@ document.addEventListener('DOMContentLoaded', () => {
     btnUiMode.addEventListener('click', () => {
         btnUiMode.classList.add('active');
         btnCodeMode.classList.remove('active');
+        btnNoiseMode.classList.remove('active');
         uiDashboardContainer.classList.remove('hidden');
         notebookContainer.classList.add('hidden');
+        noiseCompareContainer.classList.add('hidden');
+        document.querySelector('.dashboard-wrapper').classList.remove('notebook-mode-active');
         addLogEntry('Viewport toggled to UI Diagnostic Dashboard.', 'info');
     });
 
     btnCodeMode.addEventListener('click', () => {
         btnCodeMode.classList.add('active');
         btnUiMode.classList.remove('active');
+        btnNoiseMode.classList.remove('active');
         uiDashboardContainer.classList.add('hidden');
         notebookContainer.classList.remove('hidden');
+        noiseCompareContainer.classList.add('hidden');
+        document.querySelector('.dashboard-wrapper').classList.add('notebook-mode-active');
         addLogEntry('Viewport toggled to Notebook Code Viewer.', 'info');
         
         const activeItem = document.querySelector('.nav-item.active');
@@ -470,6 +860,113 @@ document.addEventListener('DOMContentLoaded', () => {
             loadCodeFile(fileName);
         }
     });
+
+    btnNoiseMode.addEventListener('click', () => {
+        btnNoiseMode.classList.add('active');
+        btnUiMode.classList.remove('active');
+        btnCodeMode.classList.remove('active');
+        uiDashboardContainer.classList.add('hidden');
+        notebookContainer.classList.add('hidden');
+        noiseCompareContainer.classList.remove('hidden');
+        document.querySelector('.dashboard-wrapper').classList.remove('notebook-mode-active');
+        addLogEntry('Viewport toggled to Noise Comparison Study View.', 'info');
+        
+        // Load the current preview image into clean view if visible
+        if (origImgPreview && origImgPreview.src && !origImgPreview.src.endsWith('/')) {
+            if (noiseCleanImg) {
+                noiseCleanImg.src = origImgPreview.src;
+                noiseCleanImg.style.display = 'block';
+            }
+            if (noiseCleanPlaceholder) noiseCleanPlaceholder.style.display = 'none';
+        }
+    });
+
+    if (btnRunNoiseCompare) {
+        btnRunNoiseCompare.addEventListener('click', async () => {
+            if (!origImgPreview || !origImgPreview.src || origImgPreview.src.endsWith('/')) {
+                showAlertModal('No Image Loaded', 'Please select an image in the UI Diagnostic Dashboard first.', 'warning');
+                return;
+            }
+            
+            addLogEntry('Initiating Noise Diagnostic Comparison Study...', 'info');
+            btnRunNoiseCompare.disabled = true;
+            btnRunNoiseCompare.textContent = 'Comparing...';
+            
+            if (noiseCorruptedPlaceholder) noiseCorruptedPlaceholder.textContent = 'Generating noisy sample & predicting...';
+            
+            try {
+                // Fetch the current original image as a blob
+                const imageRes = await fetch(origImgPreview.src);
+                const imageBlob = await imageRes.blob();
+                
+                const formData = new FormData();
+                formData.append('file', imageBlob, 'study.png');
+                formData.append('noise_type', noiseCompareType.value);
+                formData.append('intensity', parseFloat(noiseCompareSeverity.value));
+                formData.append('use_clahe', claheToggle.checked);
+                
+                const response = await fetch(`${API_BASE}/api/noise/simulate`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Simulation failed on backend server.');
+                }
+                
+                const data = await response.json();
+                
+                // Render Clean Reference Results
+                if (noiseCleanImg) {
+                    noiseCleanImg.src = `data:image/png;base64,${data.clean_image}`;
+                    noiseCleanImg.style.display = 'block';
+                }
+                if (noiseCleanPlaceholder) noiseCleanPlaceholder.style.display = 'none';
+                
+                if (noiseCleanVerdict) noiseCleanVerdict.textContent = data.clean_prediction;
+                if (noiseCleanConfidence) noiseCleanConfidence.textContent = `${data.clean_confidence}% Confidence`;
+                if (noiseCleanBanner) {
+                    noiseCleanBanner.classList.remove('pending');
+                    noiseCleanBanner.classList.toggle('malignant', data.clean_prediction === 'MALIGNANT');
+                }
+                
+                // Render Noisy Corrupted Results
+                if (noiseCorruptedImg) {
+                    noiseCorruptedImg.src = `data:image/png;base64,${data.noisy_image}`;
+                    noiseCorruptedImg.style.display = 'block';
+                }
+                if (noiseCorruptedPlaceholder) noiseCorruptedPlaceholder.style.display = 'none';
+                
+                if (noiseCorruptedVerdict) noiseCorruptedVerdict.textContent = data.noisy_prediction;
+                if (noiseCorruptedConfidence) noiseCorruptedConfidence.textContent = `${data.noisy_confidence}% Confidence`;
+                if (noiseCorruptedBanner) {
+                    noiseCorruptedBanner.classList.remove('pending');
+                    noiseCorruptedBanner.classList.toggle('malignant', data.noisy_prediction === 'MALIGNANT');
+                }
+                
+                // Render Clinical Rationale & Explanation
+                if (noiseExplanationText) {
+                    noiseExplanationText.innerHTML = `
+                        <strong style="color: var(--accent-primary);">Diagnostic Comparison Summary:</strong><br>
+                        <strong>Clean Preprocessing Verdict:</strong> <span style="color: ${data.clean_prediction === 'MALIGNANT' ? 'var(--malignant-color)' : 'var(--benign-color)'}; font-weight: bold;">${data.clean_prediction} (${data.clean_confidence}%)</span>.<br>
+                        <strong>Noisy Diagnostic Verdict:</strong> <span style="color: ${data.noisy_prediction === 'MALIGNANT' ? 'var(--malignant-color)' : 'var(--benign-color)'}; font-weight: bold;">${data.noisy_prediction} (${data.noisy_confidence}%)</span>.<br>
+                        <span style="display: block; margin-top: 8px;">${data.explanation}</span>
+                    `;
+                }
+                
+                addLogEntry('Noise Diagnostic Comparison Study completed.', 'success');
+                
+            } catch (e) {
+                console.error(e);
+                addLogEntry(`Noise study failed: ${e.message}`, 'error');
+                showAlertModal('Study Evaluation Failure', 'Unable to complete side-by-side noise comparison.', 'error');
+                if (noiseCorruptedPlaceholder) noiseCorruptedPlaceholder.textContent = 'Comparison failed.';
+            } finally {
+                btnRunNoiseCompare.disabled = false;
+                btnRunNoiseCompare.textContent = 'Run Comparison';
+            }
+        });
+    }
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -481,30 +978,188 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Code cell segmenting for Google Colab/Jupyter notebook simulation
-    function segmentCode(code) {
-        const lines = code.split('\n');
+    function segmentCode(code, fileName) {
         const cells = [];
-        let currentCell = [];
         
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            
-            const isImport = line.startsWith('import ') || line.startsWith('from ');
-            const isBlockStart = line.startsWith('class ') || line.startsWith('def ') || line.startsWith('if __name__') || line.startsWith('@app.') || line.startsWith('#');
-            
-            if (isBlockStart && currentCell.length > 0 && !isImport) {
-                cells.push(currentCell.join('\n').trim());
-                currentCell = [];
+        if (fileName === 'config.py') {
+            cells.push({
+                type: 'markdown',
+                content: `### Global Configuration Framework
+This configuration file manages:
+- System paths for training, validation, and testing partitions.
+- Preprocessing flags (CLAHE clip limits and tile grid sizes).
+- Training hyperparameters (learning rates, batch sizes, optimizer constraints).
+- Target neural network configurations and device mapping (CPU, MPS, CUDA).`
+            });
+            cells.push({
+                type: 'code',
+                content: code
+            });
+        }
+        else if (fileName === 'dataset.py') {
+            cells.push({
+                type: 'markdown',
+                content: `### 1. Clinical Data Loading & CLAHE Preprocessing
+This section imports standard medical image processing packages (OpenCV, Pillow, PyTorch) and implements Contrast Limited Adaptive Histogram Equalization (CLAHE). CLAHE normalizes contrast variations caused by different ultrasound transducers and improves lesion boundary visibility.`
+            });
+            const importsEnd = code.indexOf('class BreastUltrasoundDataset');
+            if (importsEnd !== -1) {
+                cells.push({
+                    type: 'code',
+                    content: code.substring(0, importsEnd).trim()
+                });
+                cells.push({
+                    type: 'markdown',
+                    content: `### 2. PyTorch Dataset & Transform Pipeline
+We define the custom subclass \`BreastUltrasoundDataset\`, mapping label indices and applying optional CLAHE enhancement dynamically during item retrieval. Standard data augmentation (random horizontal/vertical flips, small rotations) is configured to prevent overfitting.`
+                });
+                const datasetEnd = code.indexOf('def get_transforms()');
+                if (datasetEnd !== -1) {
+                    cells.push({
+                        type: 'code',
+                        content: code.substring(importsEnd, datasetEnd).trim()
+                    });
+                    cells.push({
+                        type: 'markdown',
+                        content: `### 3. Balanced Clinical Dataloaders
+Ultrasound datasets often suffer from class imbalance. We calculate class reciprocal weights and declare a weighted random sampler to ensure balanced training batch representation.`
+                    });
+                    cells.push({
+                        type: 'code',
+                        content: code.substring(datasetEnd).trim()
+                    });
+                } else {
+                    cells.push({
+                        type: 'code',
+                        content: code.substring(importsEnd).trim()
+                    });
+                }
+            } else {
+                cells.push({
+                    type: 'code',
+                    content: code
+                });
             }
-            currentCell.push(line);
         }
-        if (currentCell.length > 0) {
-            cells.push(currentCell.join('\n').trim());
+        else if (fileName === 'models.py') {
+            cells.push({
+                type: 'markdown',
+                content: `### 1. Custom CNN Baseline for Ultrasound Scans
+We define a custom 4-block Convolutional Neural Network baseline trained from scratch. Each block consists of 2D Convolution, Batch Normalization, ReLU activation, and Max Pooling. A classification head with high Dropout is declared to regularize features.`
+            });
+            const customCnnEnd = code.indexOf('def get_model');
+            if (customCnnEnd !== -1) {
+                cells.push({
+                    type: 'code',
+                    content: code.substring(0, customCnnEnd).trim()
+                });
+                cells.push({
+                    type: 'markdown',
+                    content: `### 2. Fine-Tuned Transfer Learning Backbones
+We implement a model factory utilizing pre-trained backbone features from ResNet-50 and EfficientNet-B0. The classification heads are customized for binary diagnostic outcomes.`
+                });
+                cells.push({
+                    type: 'code',
+                    content: code.substring(customCnnEnd).trim()
+                });
+            } else {
+                cells.push({
+                    type: 'code',
+                    content: code
+                });
+            }
+        }
+        else if (fileName === 'train.py') {
+            cells.push({
+                type: 'markdown',
+                content: `### 1. Training & Validation Epoch Loop
+We compile the core training routine. Uses AdamW optimizer, cosine annealing learning rate scheduler, and calculates accuracy and cross-entropy loss gradients.`
+            });
+            const mainStart = code.indexOf('def main()');
+            if (mainStart !== -1) {
+                cells.push({
+                    type: 'code',
+                    content: code.substring(0, mainStart).trim()
+                });
+                cells.push({
+                    type: 'markdown',
+                    content: `### 2. Hyperparameter Settings & Model Serialization
+Exposes a command line interface to train specific backbones, tracks validation loss, implements Early Stopping (patience=5), and serializes checkpoint states.`
+                });
+                cells.push({
+                    type: 'code',
+                    content: code.substring(mainStart).trim()
+                });
+            } else {
+                cells.push({
+                    type: 'code',
+                    content: code
+                });
+            }
+        }
+        else if (fileName === 'evaluate.py') {
+            cells.push({
+                type: 'markdown',
+                content: `### 1. Validation Performance Metrics
+Imports evaluation criteria: Classification Reports (Precision, Recall, F1), Confusion Matrices, ROC curves, and Area Under Curve (AUC) metrics.`
+            });
+            const evaluateStart = code.indexOf('def evaluate_model');
+            if (evaluateStart !== -1) {
+                cells.push({
+                    type: 'code',
+                    content: code.substring(0, evaluateStart).trim()
+                });
+                cells.push({
+                    type: 'markdown',
+                    content: `### 2. Evaluation Loop & Graphical Plotting
+Evaluates model weights on the independent testing split and plots standard ROC curve diagrams and confusion matrix plots to disk.`
+                });
+                cells.push({
+                    type: 'code',
+                    content: code.substring(evaluateStart).trim()
+                });
+            } else {
+                cells.push({
+                    type: 'code',
+                    content: code
+                });
+            }
+        }
+        else if (fileName === 'predict.py') {
+            cells.push({
+                type: 'markdown',
+                content: `### 1. Clinical Diagnostic Inference Interface
+Defines the core inference function. Loads serialized weights, preprocesses target images, runs predictions, and outputs likelihood statistics.`
+            });
+            const predictStart = code.indexOf('def predict_single_image');
+            if (predictStart !== -1) {
+                cells.push({
+                    type: 'code',
+                    content: code.substring(0, predictStart).trim()
+                });
+                cells.push({
+                    type: 'markdown',
+                    content: `### 2. CLI Invocation Hooks
+Sets up arguments for running predictions directly from the shell terminal.`
+                });
+                cells.push({
+                    type: 'code',
+                    content: code.substring(predictStart).trim()
+                });
+            } else {
+                cells.push({
+                    type: 'code',
+                    content: code
+                });
+            }
+        }
+        else {
+            cells.push({
+                type: 'code',
+                content: code
+            });
         }
         
-        if (cells.length <= 1) {
-            return code.split('\n\n').filter(c => c.trim().length > 0);
-        }
         return cells;
     }
 
@@ -512,23 +1167,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const notebookCellOutputs = {
         'dataset.py': [
             "Importing core clinical dependencies:\n- OpenCV (cv2) for CLAHE contrast\n- PyTorch (torch) & torchvision for normalizers\n- scikit-learn for metric analysis\nDependencies verified successfully.",
-            "Defining Contrast Limited Adaptive Histogram Equalization (CLAHE) function...\nSetting default clip_limit = 2.0, tile_grid = 8x8.\nCLAHE Contrast Equalization compiled successfully.",
-            "Compiling custom PyTorch dataset loader...\nClass MammogramDataset successfully declared.\nIncludes custom CLAHE processor hooks on load.",
+            "Compiling custom PyTorch dataset loader...\nClass BreastUltrasoundDataset successfully declared.\nIncludes custom CLAHE processor hooks on load.",
             "Creating dynamic balanced sampler framework...\nComputes reciprocal frequencies for benign (0) and malignant (1).\nsampler weights loaded successfully."
         ],
         'models.py': [
             "Importing PyTorch neural network modules and torchvision models.\nFine-tuning backbone: ResNet50\nFine-tuning backbone: EfficientNet-B0\nSuccessfully loaded pretrained weights.",
-            "Defining Custom Mammogram 4-Block CNN Architecture:\n- Conv2D(64, 3x3) + ReLU + MaxPool\n- Conv2D(128, 3x3) + ReLU + MaxPool\n- Conv2D(256, 3x3) + ReLU + MaxPool\n- Conv2D(512, 3x3) + ReLU + MaxPool\n- Dropout(0.4) + Dense(1024) + Dense(2)\nCustom CNN architecture compiled (Params: 1,248,340).",
             "Compiling backbone factory function get_model()...\nSupports 'resnet50', 'efficientnet_b0', and 'custom_cnn'.\nget_model factory loaded."
         ],
         'train.py': [
             "Importing optimizer and execution tools:\n- Optimizer: Adam (lr=1e-4)\n- Loss: Weighted Cross Entropy\nAll training loop packages active.",
-            "Defining train_one_epoch() and validate_epoch()...\nSetting Early Stopping scheduler with patience = 5.\nTraining functions successfully compiled.",
             "Checking dummy data availability...\nFound validation sample directories.\nLoading checkpoint model baseline...\nModel loaded on Device: CPU."
         ],
         'evaluate.py': [
             "Importing evaluation packages (scikit-learn classification_report, roc_curve, auc, confusion_matrix).\nPlotting utilities initialized.",
-            "Compiling evaluate_model() module...\nRuns loop across target dataloader and maps output indicators.",
             "Plot generation hooks established:\n- confusion_matrix.png\n- roc_curve.png\nEvaluation loop validated."
         ],
         'config.py': [
@@ -536,72 +1187,94 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
         'predict.py': [
             "Loading prediction dependencies...\nPreparing argparser for CLI inference options.",
-            "Compiling predict_single_image() function...\nLoads input target image, runs cv2 CLAHE, scales tensor, executes forward pass.",
             "CLI entry hooks configured.\npredict.py ready for deployment."
         ]
     };
 
     function renderNotebookCells(cells, fileName) {
         notebookCellsList.innerHTML = '';
+        let codeCellCount = 0;
         
-        cells.forEach((cellContent, index) => {
+        cells.forEach((cellData, index) => {
             const cell = document.createElement('div');
-            cell.className = 'notebook-cell';
-            cell.innerHTML = `
-                <div class="cell-left">
-                    <div class="cell-input-prompt">In [${index + 1}]:</div>
-                    <button class="cell-play-btn" title="Run Cell">
-                        <svg viewBox="0 0 24 24" width="10" height="10"><polygon points="8 5 18 12 8 19 8 5"></polygon></svg>
-                    </button>
-                </div>
-                <div class="cell-code-container">
-                    <pre><code>${escapeHtml(cellContent)}</code></pre>
-                    <!-- Colab style output cell -->
-                    <div class="cell-output-container hidden" id="out-${fileName}-${index}">
-                        <div class="cell-output-header">Output</div>
-                        <pre class="cell-output-text"></pre>
-                    </div>
-                </div>
-            `;
             
-            cell.querySelector('.cell-play-btn').addEventListener('click', () => {
-                runCell(cell, fileName, index);
-            });
+            if (cellData.type === 'markdown') {
+                cell.className = 'notebook-cell markdown-cell';
+                let html = cellData.content
+                    .replace(/^### (.*$)/gim, '<h3 style="margin-top: 8px; margin-bottom: 8px; color: var(--accent-primary); font-size: 0.95rem;">$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2 style="margin-top: 12px; margin-bottom: 8px; color: var(--text-primary); font-size: 1.1rem;">$1</h2>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\`(.*?)\`/g, '<code style="background: rgba(255,255,255,0.06); padding: 2px 4px; border-radius: 4px; font-size: 0.8rem; font-family: monospace; color: var(--text-primary);">$1</code>')
+                    .replace(/^- (.*$)/gim, '<li style="margin-left: 16px; margin-bottom: 4px;">$1</li>');
+                
+                cell.innerHTML = `
+                    <div class="cell-left" style="opacity: 0.3; font-size: 0.7rem; padding-top: 4px;">[md]</div>
+                    <div class="cell-markdown-container" style="color: var(--text-secondary); font-size: 0.82rem; line-height: 1.5; padding: 4px 10px;">
+                        ${html}
+                    </div>
+                `;
+            } else {
+                codeCellCount++;
+                cell.className = 'notebook-cell code-cell';
+                cell.innerHTML = `
+                    <div class="cell-left">
+                        <div class="cell-input-prompt">In [${codeCellCount}]:</div>
+                        <button class="cell-play-btn" title="Run Cell">
+                            <svg viewBox="0 0 24 24" width="10" height="10"><polygon points="8 5 18 12 8 19 8 5"></polygon></svg>
+                        </button>
+                    </div>
+                    <div class="cell-code-container">
+                        <pre><code>${escapeHtml(cellData.content)}</code></pre>
+                        <!-- Colab style output cell -->
+                        <div class="cell-output-container hidden" id="out-${fileName}-${index}">
+                            <div class="cell-output-header">Output</div>
+                            <pre class="cell-output-text"></pre>
+                        </div>
+                    </div>
+                `;
+                
+                cell.querySelector('.cell-play-btn').addEventListener('click', () => {
+                    runCell(cell, fileName, index, codeCellCount);
+                });
+            }
             
             notebookCellsList.appendChild(cell);
         });
     }
 
-    function runCell(cellElement, fileName, cellIndex) {
+    function runCell(cellElement, fileName, cellIndex, codeIndex) {
         const playBtn = cellElement.querySelector('.cell-play-btn');
         const prompt = cellElement.querySelector('.cell-input-prompt');
         const outputContainer = cellElement.querySelector('.cell-output-container');
         const outputText = cellElement.querySelector('.cell-output-text');
 
-        prompt.textContent = 'In [*]:';
-        playBtn.style.color = '#38bdf8';
-        outputContainer.classList.remove('hidden');
-        outputContainer.classList.add('running');
-        outputText.textContent = 'Running process cell...';
+        if (prompt) prompt.textContent = 'In [*]:';
+        if (playBtn) playBtn.style.color = '#38bdf8';
+        if (outputContainer) {
+            outputContainer.classList.remove('hidden');
+            outputContainer.classList.add('running');
+        }
+        if (outputText) outputText.textContent = 'Running process cell...';
 
-        addLogEntry(`Executing Notebook cell [${cellIndex + 1}] inside ${fileName}...`, 'info');
+        addLogEntry(`Executing Notebook cell [${codeIndex}] inside ${fileName}...`, 'info');
         
         setTimeout(() => {
-            prompt.textContent = `In [${cellIndex + 1}]:`;
-            playBtn.style.color = '';
-            outputContainer.classList.remove('running');
+            if (prompt) prompt.textContent = `In [${codeIndex}]:`;
+            if (playBtn) playBtn.style.color = '';
+            if (outputContainer) outputContainer.classList.remove('running');
             
             // Query mock stdout output text
             const outputs = notebookCellOutputs[fileName] || ["Cell execution completed successfully."];
-            const output = outputs[cellIndex] || "Execution completed.";
-            outputText.textContent = output;
+            // Since markdown cells exist, map code index appropriately
+            const output = outputs[codeIndex - 1] || "Execution completed.";
+            if (outputText) outputText.textContent = output;
 
-            addLogEntry(`Cell [${cellIndex + 1}] in ${fileName} executed successfully.`, 'success');
+            addLogEntry(`Cell [${codeIndex}] in ${fileName} executed successfully.`, 'success');
         }, 600);
     }
 
     async function loadCodeFile(fileName) {
-        activeFileName.textContent = fileName;
+        if (activeFileName) activeFileName.textContent = fileName;
         addLogEntry(`Accessing source file: ${fileName}`, 'info');
         
         if (codeCache[fileName]) {
@@ -617,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('Failed to retrieve file contents');
             }
             const data = await response.json();
-            const cells = segmentCode(data.code);
+            const cells = segmentCode(data.code, fileName);
             codeCache[fileName] = cells;
             renderNotebookCells(cells, fileName);
             addLogEntry(`Source file ${fileName} loaded as Jupyter notebook cells.`, 'success');
@@ -632,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cells = notebookCellsList.querySelectorAll('.notebook-cell');
         if (cells.length === 0) return;
         
-        const fileName = activeFileName.textContent;
+        const fileName = activeFileName ? activeFileName.textContent : '';
         addLogEntry(`Running all ${cells.length} cells in ${fileName} sequentially...`, 'info');
         let i = 0;
         
@@ -651,17 +1324,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Copy to clipboard
     btnCopyCode.addEventListener('click', () => {
-        const file = activeFileName.textContent;
+        const file = activeFileName ? activeFileName.textContent : '';
         const cells = codeCache[file];
         if (!cells) return;
         const codeText = cells.join('\n\n');
         
         navigator.clipboard.writeText(codeText).then(() => {
-            const origText = btnCopyCode.textContent;
-            btnCopyCode.textContent = 'Copied!';
+            const origText = btnCopyCode ? btnCopyCode.textContent : '';
+            if (btnCopyCode) btnCopyCode.textContent = 'Copied!';
             addLogEntry(`Copied source contents of ${file} to clipboard.`, 'success');
             setTimeout(() => {
-                btnCopyCode.textContent = origText;
+                if (btnCopyCode) btnCopyCode.textContent = origText;
             }, 1500);
         }).catch(err => {
             addLogEntry('Failed to copy code.', 'error');

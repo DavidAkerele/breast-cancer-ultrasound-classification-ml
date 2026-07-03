@@ -9,14 +9,14 @@ TEST_DIR = os.path.join(DATA_DIR, "test")
 
 # Model checkpoints and outputs
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs")
-CHECKPOINT_PATH = os.path.join(OUTPUT_DIR, "best_mammogram_model.pth")
+CHECKPOINT_PATH = os.path.join(OUTPUT_DIR, "best_ultrasound_model.pth")
 
 # Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Image hyperparameters
 IMG_SIZE = 224  # Standard input resolution for ResNet / EfficientNet
-CHANNELS = 3    # RGB (Grayscale mammograms are replicated to 3 channels for transfer learning)
+CHANNELS = 3    # RGB (Grayscale ultrasound scans are replicated to 3 channels for transfer learning)
 
 # Classification configuration
 # 0: Benign / Normal, 1: Malignant

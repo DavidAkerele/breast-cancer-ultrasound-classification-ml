@@ -22,23 +22,23 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-header {
-        background: linear-gradient(135deg, #0e1726, #1e293b);
+        background: linear-gradient(135deg, #000000, #0a0a0a);
         padding: 2rem;
         border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         margin-bottom: 2rem;
     }
     .metric-card {
-        background: rgba(30, 41, 59, 0.6);
+        background: rgba(10, 10, 10, 0.8);
         padding: 1.5rem;
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         text-align: center;
     }
     .disclaimer {
         font-size: 0.85rem;
         color: #94a3b8;
-        background: rgba(15, 23, 42, 0.8);
+        background: rgba(5, 5, 5, 0.9);
         padding: 1rem;
         border-radius: 8px;
         border-left: 4px solid #38bdf8;
@@ -73,18 +73,18 @@ with st.sidebar:
     st.image("https://img.icons8.com/color/96/000000/ribbon--v1.png", width=64)
     st.header("Dissertation Research")
     st.markdown("---")
-    st.markdown("**Topic:** Automated Breast Cancer Mammogram Classification using Deep Convolutional Neural Networks")
+    st.markdown("**Topic:** Automated Breast Cancer Ultrasound Classification using Deep Convolutional Neural Networks")
     st.markdown("**Backend:** PyTorch & OpenCV CLAHE")
     st.markdown("**Framework:** Streamlit / FastAPI")
     st.markdown("---")
-    use_clahe = st.toggle("Apply CLAHE Contrast Enhancement", value=True, help="Equalizes microcalcification contrast")
+    use_clahe = st.toggle("Apply CLAHE Contrast Enhancement", value=True, help="Equalizes lesion contrast")
     st.markdown("<div class='disclaimer'>⚠️ <b>Academic Research Prototype:</b> Not intended for primary clinical diagnosis without radiologist verification.</div>", unsafe_allow_html=True)
 
 # Header
 st.markdown("""
 <div class="main-header">
     <h1 style="color: #38bdf8; margin: 0;">🎗️ OncoVision AI Diagnostic Suite</h1>
-    <p style="color: #cbd5e1; font-size: 1.1rem; margin-top: 8px;">Dissertation Prototype: Automated Mammogram Classification & Tissue Analysis</p>
+    <p style="color: #cbd5e1; font-size: 1.1rem; margin-top: 8px;">Dissertation Prototype: Automated Breast Ultrasound Classification & Tissue Analysis</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -92,10 +92,10 @@ col1, col2 = st.columns([1, 1.2], gap="large")
 
 with col1:
     st.subheader("1. Scan Input & Preprocessing")
-    uploaded_file = st.file_uploader("Upload Mammogram Study (PNG, JPEG, TIFF)", type=["png", "jpg", "jpeg", "tif"])
+    uploaded_file = st.file_uploader("Upload Breast Ultrasound Study (PNG, JPEG, TIFF)", type=["png", "jpg", "jpeg", "tif"])
     
     if not uploaded_file:
-        st.info("💡 Upload a mammogram image or select a benchmark sample below.")
+        st.info("💡 Upload a breast ultrasound image or select a benchmark sample below.")
         if st.button("Load Benchmark Malignant Sample"):
             sample_path = os.path.join(config.DATA_DIR, "val", "malignant", "sample_0.png")
             if os.path.exists(sample_path):
@@ -149,4 +149,4 @@ with col2:
         st.write(f"**Malignant:** {m_prob*100:.2f}%")
         st.progress(m_prob)
     else:
-        st.warning("Awaiting mammogram upload to execute neural classification.")
+        st.warning("Awaiting breast ultrasound upload to execute neural classification.")

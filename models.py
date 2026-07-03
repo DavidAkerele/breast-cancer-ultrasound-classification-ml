@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
-class CustomMammogramCNN(nn.Module):
+class CustomUltrasoundCNN(nn.Module):
     """
     A custom Convolutional Neural Network baseline built from scratch.
     Features 4 Convolutional blocks with BatchNorm, ReLU activation, and MaxPooling,
     followed by Adaptive Average Pooling and Dropout to prevent overfitting.
     """
     def __init__(self, num_classes=2, in_channels=3):
-        super(CustomMammogramCNN, self).__init__()
+        super(CustomUltrasoundCNN, self).__init__()
 
         self.features = nn.Sequential(
             # Block 1: 224x224 -> 112x112
@@ -69,8 +69,8 @@ def get_model(model_name="resnet50", num_classes=2, pretrained=True):
     model_name = model_name.lower()
 
     if model_name == "custom_cnn":
-        print(f"Initializing Custom Mammogram CNN (num_classes={num_classes})")
-        model = CustomMammogramCNN(num_classes=num_classes)
+        print(f"Initializing Custom Ultrasound CNN (num_classes={num_classes})")
+        model = CustomUltrasoundCNN(num_classes=num_classes)
 
     elif model_name == "resnet50":
         print(f"Initializing ResNet-50 (pretrained={pretrained}, num_classes={num_classes})")

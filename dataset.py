@@ -11,7 +11,7 @@ import config
 def apply_clahe(img_np):
     """
     Applies Contrast Limited Adaptive Histogram Equalization (CLAHE)
-    to improve contrast of breast structures and microcalcifications in mammograms.
+    to improve contrast of breast structures and lesion margins in ultrasound scans.
     """
     # If image is RGB/BGR, convert to LAB or process intensity channel
     if len(img_np.shape) == 3 and img_np.shape[2] == 3:
@@ -27,9 +27,9 @@ def apply_clahe(img_np):
         clahe = cv2.createCLAHE(clipLimit=config.CLAHE_CLIP_LIMIT, tileGridSize=config.CLAHE_TILE_GRID_SIZE)
         return clahe.apply(img_np)
 
-class MammogramDataset(Dataset):
+class BreastUltrasoundDataset(Dataset):
     """
-    Custom Dataset for Breast Cancer Mammograms.
+    Custom Dataset for Breast Cancer Ultrasound Scans.
     Supports directory structure where subfolders represent classes:
         data/train/benign/img1.png
         data/train/malignant/img2.png
@@ -87,7 +87,7 @@ class MammogramDataset(Dataset):
 def get_transforms():
     """
     Returns standard training and validation data transformations.
-    Mammograms benefit from random flips and gentle rotations (invariance to orientation).
+    Ultrasound scans benefit from random flips and gentle rotations (invariance to orientation).
     """
     train_transform = transforms.Compose([
         transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)),
@@ -114,9 +114,9 @@ def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0):
     """
     train_transform, val_transform = get_transforms()
 
-    train_dataset = MammogramDataset(root_dir=config.TRAIN_DIR, transform=train_transform, use_clahe=config.USE_CLAHE)
-    val_dataset = MammogramDataset(root_dir=config.VAL_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
-    test_dataset = MammogramDataset(root_dir=config.TEST_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
+    train_dataset = BreastUltrasoundDataset(root_dir=config.TRAIN_DIR, transform=train_transform, use_clahe=config.USE_CLAHE)
+    val_dataset = BreastUltrasoundDataset(root_dir=config.VAL_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
+    test_dataset = BreastUltrasoundDataset(root_dir=config.TEST_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)

@@ -37,8 +37,8 @@ def predict_image(image_path, model, transform, device, use_clahe=True):
     return pred_class, confidence, probs.cpu().numpy()
 
 def main():
-    parser = argparse.ArgumentParser(description="Predict Breast Cancer Mammogram Class")
-    parser.add_argument("--image", type=str, required=True, help="Path to mammogram image file or folder")
+    parser = argparse.ArgumentParser(description="Predict Breast Cancer Ultrasound Class")
+    parser.add_argument("--image", type=str, required=True, help="Path to breast ultrasound image file or folder")
     parser.add_argument("--checkpoint", type=str, default=config.CHECKPOINT_PATH, help="Path to model checkpoint")
     args = parser.parse_args()
 

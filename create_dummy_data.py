@@ -98,7 +98,7 @@ def create_dummy_dataset(num_train=30, num_val=10):
     print("Generating synthetic dummy dataset for immediate pipeline testing...")
     for split, count in [("train", num_train), ("val", num_val), ("test", num_val)]:
         for class_idx, class_name in enumerate(config.CLASS_NAMES):
-            class_dir = os.path.join(config.DATA_DIR, split, class_name)
+            class_dir = os.path.join(config.DATA_DIR, "busi", split, class_name)
             os.makedirs(class_dir, exist_ok=True)
 
             is_malignant = (class_name == "malignant")
@@ -107,7 +107,7 @@ def create_dummy_dataset(num_train=30, num_val=10):
                 filepath = os.path.join(class_dir, f"sample_{i}.png")
                 cv2.imwrite(filepath, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
-    print(f"Dummy dataset generated successfully at: {config.DATA_DIR}")
+    print(f"Dummy dataset generated successfully at: {os.path.join(config.DATA_DIR, 'busi')}")
 
 if __name__ == "__main__":
     create_dummy_dataset(num_train=50, num_val=25)

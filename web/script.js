@@ -14,6 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const existingStudySelect = document.getElementById('existingStudySelect');
     const datasetSplitSelect = document.getElementById('datasetSplitSelect');
 
+    // Crop Modal Elements
+    const cropModalOverlay = document.getElementById('cropModalOverlay');
+    const cropModalImg = document.getElementById('cropModalImg');
+    let cropModalCancel = document.getElementById('cropModalCancel');
+    let cropModalConfirm = document.getElementById('cropModalConfirm');
+    let cropper = null;
+
     const emptyState = document.getElementById('emptyState');
     const loadingState = document.getElementById('loadingState');
     const resultsContent = document.getElementById('resultsContent');
@@ -157,14 +164,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     fetchServerStatus();
 
+    let activePredictionData = null;
+
     // Gallery elements
     const galleryGrid = document.getElementById('galleryGrid');
     const galleryCount = document.getElementById('galleryCount');
 
     // Fetch and populate existing patient files + image gallery
-    async function fetchDatasetFiles(split = 'val') {
+    const datasetSelect = document.getElementById('datasetSelect');
+
+    // Fetch and populate existing patient files + image gallery
+    async function fetchDatasetFiles(dataset = 'busi', split = 'val') {
         try {
-            const response = await fetch(`${API_BASE}/api/dataset/files?split=${split}`);
+            const response = await fetch(`${API_BASE}/api/dataset/files?dataset=${dataset}&split=${split}`);
             if (response.ok) {
                 const data = await response.json();
 
@@ -173,7 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.forEach(item => {
                     const option = document.createElement('option');
                     option.value = item.url;
-                    option.textContent = `${item.name} (${item.class.toUpperCase()})`;
+                    // Extract case number safely without query params
+                    let display_name = item.name;
+                    if (display_name.includes('?')) display_name = display_name.split('?')[0];
+                    option.textContent = `${display_name} (${item.class.toUpperCase()})`;
                     existingStudySelect.appendChild(option);
                 });
 
@@ -205,40 +220,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (galleryCount) galleryCount.textContent = `${data.length} scans`;
 
-                addLogEntry(`Loaded ${data.length} files from ${split} split database.`, 'success');
+                addLogEntry(`Loaded ${data.length} files from ${dataset.toUpperCase()} (${split}) split database.`, 'success');
             }
         } catch (e) {
-            addLogEntry(`Failed to fetch ${split} dataset index.`, 'warning');
+            addLogEntry(`Failed to fetch ${dataset.toUpperCase()} (${split}) dataset index.`, 'warning');
         }
     }
     
+    function reloadDataset() {
+        const dataset = datasetSelect ? datasetSelect.value : 'busi';
+        const split = datasetSplitSelect ? datasetSplitSelect.value : 'val';
+        fetchDatasetFiles(dataset, split);
+        selectedFile = null;
+        selectedFiles = [];
+        analyzeBtn.disabled = true;
+        existingStudySelect.value = '';
+        showState('empty');
+    }
+
     // Initial fetch
+    const initialDataset = datasetSelect ? datasetSelect.value : 'busi';
     const initialSplit = datasetSplitSelect ? datasetSplitSelect.value : 'val';
-    fetchDatasetFiles(initialSplit);
+    fetchDatasetFiles(initialDataset, initialSplit);
 
     // Fetch new dataset split files when selection changes
     if (datasetSplitSelect) {
-        datasetSplitSelect.addEventListener('change', (e) => {
-            const split = e.target.value;
-            fetchDatasetFiles(split);
-            selectedFile = null;
-            selectedFiles = [];
-            analyzeBtn.disabled = true;
-            existingStudySelect.value = '';
-            showState('empty');
+        datasetSplitSelect.addEventListener('change', () => {
+            reloadDataset();
         });
     }
 
-    // Segmented tab controls interaction
-    const segmentBtns = document.querySelectorAll('#datasetSplitTabs .segment-btn');
-    segmentBtns.forEach(btn => {
+    if (datasetSelect) {
+        datasetSelect.addEventListener('change', () => {
+            reloadDataset();
+        });
+    }
+
+    // Segmented tab controls interaction for Split
+    const splitSegmentBtns = document.querySelectorAll('#datasetSplitTabs .segment-btn');
+    splitSegmentBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            segmentBtns.forEach(b => b.classList.remove('active'));
+            splitSegmentBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const val = btn.getAttribute('data-value');
             if (datasetSplitSelect) {
                 datasetSplitSelect.value = val;
                 datasetSplitSelect.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+
+    // Segmented tab controls interaction for Dataset
+    const datasetSegmentBtns = document.querySelectorAll('#datasetTabs .segment-btn');
+    datasetSegmentBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            datasetSegmentBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const val = btn.getAttribute('data-value');
+            if (datasetSelect) {
+                datasetSelect.value = val;
+                datasetSelect.dispatchEvent(new Event('change'));
             }
         });
     });
@@ -318,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Handle existing study dropdown selection
-    existingStudySelect.addEventListener('change', (e) => {
+    existingStudySelect.addEventListener('change', async (e) => {
         const url = e.target.value;
         if (!url) {
             selectedFile = null;
@@ -334,14 +375,10 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedFiles = [];
         fileInput.value = ''; 
         
-        // Extract filename for UI display
-        const filename = url.substring(url.lastIndexOf('/') + 1);
-        const h3 = dropzone ? dropzone.querySelector('h3') : null;
-        const p = dropzone ? dropzone.querySelector('p') : null;
-        if (h3) h3.textContent = filename;
-        if (p) {
-            const split = datasetSplitSelect ? datasetSplitSelect.value : 'validation';
-            p.textContent = `Selected from ${split} database`;
+        // Extract filename for UI display (strip query parameters if present)
+        let filename = url.substring(url.lastIndexOf('/') + 1);
+        if (filename.includes('?')) {
+            filename = filename.split('?')[0];
         }
 
         // Sync gallery active state
@@ -350,14 +387,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.classList.toggle('active', el.dataset.url === url);
             });
         }
+
+        addLogEntry(`Downloading patient study: ${filename} for ROI selection...`, 'info');
+        showState('loading');
         
-        // Set original preview image source directly from server path
-        if (origImgPreview) origImgPreview.src = `${API_BASE}${url}`;
-        if (analyzeBtn) analyzeBtn.disabled = false;
-        
-        addLogEntry(`Selected validation study: ${filename}`, 'info');
-        showState('results'); 
-        resetDiagnosticOutcomes();
+        try {
+            const response = await fetch(`${API_BASE}${url}`);
+            if (!response.ok) throw new Error('Failed to retrieve scan image');
+            const blob = await response.blob();
+            
+            const reader = new FileReader();
+            reader.onload = (eReader) => {
+                openCropperModal(eReader.target.result, filename, (croppedBlob, croppedDataUrl) => {
+                    selectedFile = new File([croppedBlob], filename, {type: "image/png"});
+                    
+                    const h3 = dropzone ? dropzone.querySelector('h3') : null;
+                    const p = dropzone ? dropzone.querySelector('p') : null;
+                    if (h3) h3.textContent = filename;
+                    if (p) {
+                        const split = datasetSplitSelect ? datasetSplitSelect.value : 'val';
+                        p.textContent = `Selected from ${split.toUpperCase()} split (ROI Cropped)`;
+                    }
+                    
+                    if (dropzonePreviewImg) dropzonePreviewImg.src = croppedDataUrl;
+                    if (previewFilename) previewFilename.textContent = filename;
+                    if (previewFilesize) previewFilesize.textContent = `${(croppedBlob.size / 1024 / 1024).toFixed(2)} MB • Ready`;
+                    
+                    if (dropzoneContent) dropzoneContent.classList.add('hidden');
+                    if (dropzonePreview) dropzonePreview.classList.remove('hidden');
+                    
+                    if (origImgPreview) origImgPreview.src = croppedDataUrl;
+                    showState('results');
+                    resetDiagnosticOutcomes();
+                    
+                    if (analyzeBtn) analyzeBtn.disabled = false;
+                    addLogEntry(`ROI selected for validation study: ${filename}`, 'info');
+                });
+            };
+            reader.readAsDataURL(blob);
+        } catch (err) {
+            addLogEntry(`Failed to load patient study: ${err.message}`, 'error');
+            showAlertModal('Study Load Error', err.message, 'error');
+            showState('empty');
+        }
     });
 
     // Bind clickable cards for Target Architecture Selector
@@ -424,6 +496,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function openCropperModal(imageSrc, filename, onConfirmCallback) {
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        
+        cropModalImg.src = imageSrc;
+        cropModalOverlay.classList.add('visible');
+        
+        cropper = new Cropper(cropModalImg, {
+            aspectRatio: 1, // Force square crop
+            viewMode: 1, // Restrict crop box to not exceed the size of the canvas
+            autoCropArea: 0.8, // 80% of image size by default
+            responsive: true,
+            restore: false,
+            guides: true,
+            center: true,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+            toggleDragModeOnDblclick: false
+        });
+        
+        const newConfirm = () => {
+            if (!cropper) return;
+            cropper.getCroppedCanvas({
+                width: 512,
+                height: 512,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high'
+            }).toBlob((blob) => {
+                cropModalOverlay.classList.remove('visible');
+                cropper.destroy();
+                cropper = null;
+                onConfirmCallback(blob, URL.createObjectURL(blob));
+            }, 'image/png');
+        };
+        
+        const newCancel = () => {
+            cropModalOverlay.classList.remove('visible');
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            if (!selectedFile) {
+                showState('empty');
+            } else {
+                showState('results');
+            }
+        };
+        
+        const confirmBtnClone = cropModalConfirm.cloneNode(true);
+        const cancelBtnClone = cropModalCancel.cloneNode(true);
+        
+        cropModalConfirm.parentNode.replaceChild(confirmBtnClone, cropModalConfirm);
+        cropModalCancel.parentNode.replaceChild(cancelBtnClone, cropModalCancel);
+        
+        confirmBtnClone.addEventListener('click', newConfirm);
+        cancelBtnClone.addEventListener('click', newCancel);
+        
+        cropModalConfirm = confirmBtnClone;
+        cropModalCancel = cancelBtnClone;
+    }
+
     function handleFileSelect(files) {
         existingStudySelect.value = ''; // Reset dropdown selection
         
@@ -448,28 +584,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 showAlertModal('Invalid File Format', 'Please select a valid image file (PNG, JPEG, TIFF).', 'warning');
                 return;
             }
-            selectedFile = file;
-            selectedFiles = [];
             
-            // Read file and generate thumbnail preview in dropzone
             const reader = new FileReader();
             reader.onload = (e) => {
-                if (dropzonePreviewImg) dropzonePreviewImg.src = e.target.result;
-                if (previewFilename) previewFilename.textContent = file.name;
-                if (previewFilesize) previewFilesize.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB • Ready`;
-                
-                if (dropzoneContent) dropzoneContent.classList.add('hidden');
-                if (dropzonePreview) dropzonePreview.classList.remove('hidden');
-                
-                // Set the main visualizer preview & show results frame with pending diagnostics
-                if (origImgPreview) origImgPreview.src = e.target.result;
-                showState('results');
-                resetDiagnosticOutcomes();
+                openCropperModal(e.target.result, file.name, (croppedBlob, croppedDataUrl) => {
+                    selectedFile = new File([croppedBlob], file.name, {type: "image/png"});
+                    selectedFiles = [];
+                    
+                    if (dropzonePreviewImg) dropzonePreviewImg.src = croppedDataUrl;
+                    if (previewFilename) previewFilename.textContent = file.name;
+                    if (previewFilesize) previewFilesize.textContent = `${(croppedBlob.size / 1024 / 1024).toFixed(2)} MB • Ready`;
+                    
+                    if (dropzoneContent) dropzoneContent.classList.add('hidden');
+                    if (dropzonePreview) dropzonePreview.classList.remove('hidden');
+                    
+                    if (origImgPreview) origImgPreview.src = croppedDataUrl;
+                    showState('results');
+                    resetDiagnosticOutcomes();
+                    
+                    if (analyzeBtn) analyzeBtn.disabled = false;
+                    addLogEntry(`ROI selected for ultrasound study: ${file.name}`, 'info');
+                });
             };
             reader.readAsDataURL(file);
-            
-            if (analyzeBtn) analyzeBtn.disabled = false;
-            addLogEntry(`Ultrasound study selected: ${file.name}`, 'info');
         }
     }
 
@@ -521,7 +658,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (existingStudySelect.value) {
             // Selected an existing file from the validation dropdown
             const url = existingStudySelect.value;
-            const filename = url.substring(url.lastIndexOf('/') + 1);
+            let filename = url.substring(url.lastIndexOf('/') + 1);
+            if (filename.includes('?')) {
+                filename = filename.split('?')[0];
+            }
             showState('loading');
             addLogEntry(`Fetching validation file content for: ${filename}...`, 'info');
             
@@ -690,6 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderResults(data) {
+        activePredictionData = data;
         if (origImgPreview) origImgPreview.src = data.original_image;
         if (claheImgPreview) {
             claheImgPreview.src = data.processed_image;
@@ -840,7 +981,9 @@ document.addEventListener('DOMContentLoaded', () => {
         uiDashboardContainer.classList.remove('hidden');
         notebookContainer.classList.add('hidden');
         noiseCompareContainer.classList.add('hidden');
-        document.querySelector('.dashboard-wrapper').classList.remove('notebook-mode-active');
+        const wrapper = document.querySelector('.dashboard-wrapper');
+        wrapper.classList.remove('notebook-mode-active');
+        wrapper.classList.remove('noise-mode-active');
         addLogEntry('Viewport toggled to UI Diagnostic Dashboard.', 'info');
     });
 
@@ -851,7 +994,9 @@ document.addEventListener('DOMContentLoaded', () => {
         uiDashboardContainer.classList.add('hidden');
         notebookContainer.classList.remove('hidden');
         noiseCompareContainer.classList.add('hidden');
-        document.querySelector('.dashboard-wrapper').classList.add('notebook-mode-active');
+        const wrapper = document.querySelector('.dashboard-wrapper');
+        wrapper.classList.add('notebook-mode-active');
+        wrapper.classList.remove('noise-mode-active');
         addLogEntry('Viewport toggled to Notebook Code Viewer.', 'info');
         
         const activeItem = document.querySelector('.nav-item.active');
@@ -868,7 +1013,9 @@ document.addEventListener('DOMContentLoaded', () => {
         uiDashboardContainer.classList.add('hidden');
         notebookContainer.classList.add('hidden');
         noiseCompareContainer.classList.remove('hidden');
-        document.querySelector('.dashboard-wrapper').classList.remove('notebook-mode-active');
+        const wrapper = document.querySelector('.dashboard-wrapper');
+        wrapper.classList.remove('notebook-mode-active');
+        wrapper.classList.add('noise-mode-active');
         addLogEntry('Viewport toggled to Noise Comparison Study View.', 'info');
         
         // Load the current preview image into clean view if visible
@@ -976,6 +1123,35 @@ document.addEventListener('DOMContentLoaded', () => {
             loadCodeFile(fileName);
         });
     });
+
+    // --- Redesign Sidebar Theme & Audit Console Drawer Toggles ---
+    const btnToggleTheme = document.getElementById('btnToggleTheme');
+    if (btnToggleTheme) {
+        btnToggleTheme.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            const isDark = document.body.classList.contains('dark-theme');
+            addLogEntry(`UI theme toggled to ${isDark ? 'Dark Mode' : 'Light Mode'}.`, 'info');
+        });
+    }
+
+    const btnToggleAuditLog = document.getElementById('btnToggleAuditLog');
+    const btnHideAuditLog = document.getElementById('btnHideAuditLog');
+    const auditLogDrawer = document.getElementById('auditLogDrawer');
+
+    if (btnToggleAuditLog && auditLogDrawer) {
+        btnToggleAuditLog.addEventListener('click', () => {
+            auditLogDrawer.classList.toggle('open');
+            const isOpen = auditLogDrawer.classList.contains('open');
+            addLogEntry(`${isOpen ? 'Opened' : 'Closed'} Clinical Audit Log console.`, 'info');
+        });
+    }
+
+    if (btnHideAuditLog && auditLogDrawer) {
+        btnHideAuditLog.addEventListener('click', () => {
+            auditLogDrawer.classList.remove('open');
+            addLogEntry('Closed Clinical Audit Log console.', 'info');
+        });
+    }
 
     // Code cell segmenting for Google Colab/Jupyter notebook simulation
     function segmentCode(code, fileName) {
@@ -1340,4 +1516,195 @@ Sets up arguments for running predictions directly from the shell terminal.`
             addLogEntry('Failed to copy code.', 'error');
         });
     });
+
+    // Download PDF Diagnostic Report
+    const downloadReportBtn = document.getElementById('downloadReportBtn');
+    if (downloadReportBtn) {
+        downloadReportBtn.addEventListener('click', () => {
+            if (!activePredictionData) {
+                addLogEntry('No diagnostic results available to export.', 'warning');
+                return;
+            }
+            generatePDFReport(activePredictionData);
+        });
+    }
+
+    function generatePDFReport(data) {
+        addLogEntry('Compiling diagnostic PDF report...', 'info');
+
+        const activeDataset = datasetSelect ? datasetSelect.value.toUpperCase() : 'BUSI';
+        const activeSplit = datasetSplitSelect ? datasetSplitSelect.value.toUpperCase() : 'VAL';
+        const activeModel = modelSelect ? modelSelect.options[modelSelect.selectedIndex].text : 'ResNet-50';
+        
+        let filename = 'Uploaded Scan';
+        if (existingStudySelect && existingStudySelect.value) {
+            filename = existingStudySelect.value.substring(existingStudySelect.value.lastIndexOf('/') + 1);
+            if (filename.includes('?')) filename = filename.split('?')[0];
+        }
+
+        // Get clinical details text
+        const birads = document.getElementById('clinicalBirads')?.textContent || 'N/A';
+        const density = document.getElementById('clinicalDensity')?.textContent || 'N/A';
+        const shadowing = document.getElementById('clinicalShadowing')?.textContent || 'N/A';
+        const rationale = document.getElementById('clinicalSummaryText')?.textContent || 'N/A';
+
+        // Read actual noise analysis from backend payload
+        const noiseAnalysis = data.noise_analysis || {};
+        const dominantType = noiseAnalysis.dominant_type || 'Mixed Acoustic Speckle';
+        const dominantDesc = noiseAnalysis.description || 'Standard acoustic speckle signature with normal sensor thermal parameters.';
+        
+        const metrics = noiseAnalysis.metrics || {};
+        const snrDb = metrics.snr_db !== undefined ? `${metrics.snr_db} dB` : 'N/A';
+        const speckleLevel = metrics.speckle_level !== undefined ? Math.round(metrics.speckle_level) : 0;
+        const gaussianLevel = metrics.gaussian_level !== undefined ? Math.round(metrics.gaussian_level) : 0;
+        const impulseLevel = metrics.impulse_level !== undefined ? Math.round(metrics.impulse_level) : 0;
+
+        // Create temporary div container for styling print
+        const reportContainer = document.createElement('div');
+        reportContainer.style.padding = '40px';
+        reportContainer.style.color = '#0f172a';
+        reportContainer.style.background = '#ffffff';
+        reportContainer.style.fontFamily = "'Outfit', sans-serif";
+        reportContainer.style.fontSize = '12px';
+        reportContainer.style.lineHeight = '1.5';
+
+        const isMalignant = data.prediction === 'MALIGNANT';
+        const themeColor = isMalignant ? '#ef4444' : '#10b981';
+
+        reportContainer.innerHTML = `
+            <!-- Report Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 25px;">
+                <div>
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #1e3a8a; letter-spacing: -0.5px;">ONCOVISION AI</h1>
+                    <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Automated Diagnostic Suite</p>
+                </div>
+                <div style="text-align: right;">
+                    <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Ultrasound Diagnostic Report</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b;">Date: ${new Date().toLocaleString()}</p>
+                </div>
+            </div>
+
+            <!-- Case Summary Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; background: #f8fafc; border-radius: 8px; padding: 15px; border: 1px solid #f1f5f9;">
+                <div>
+                    <h4 style="margin: 0 0 10px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.5px;">Assessment Metadata</h4>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                        <tr>
+                            <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Study Filename:</td>
+                            <td style="padding: 4px 0; color: #0f172a; font-weight: 600; text-align: right;">${filename}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Neural Network Model:</td>
+                            <td style="padding: 4px 0; color: #0f172a; font-weight: 600; text-align: right;">${activeModel}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Clinical Dataset:</td>
+                            <td style="padding: 4px 0; color: #0f172a; font-weight: 600; text-align: right;">${activeDataset} (${activeSplit} split)</td>
+                        </tr>
+                    </table>
+                </div>
+                <div style="border-left: 1px solid #e2e8f0; padding-left: 20px;">
+                    <h4 style="margin: 0 0 10px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.5px;">AI Verdict Summary</h4>
+                    <div style="background: ${themeColor}10; border: 1px solid ${themeColor}30; border-radius: 6px; padding: 10px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-weight: 700; color: ${themeColor}; font-size: 14px; margin: 0;">${data.prediction}</span>
+                        <span style="font-weight: 700; color: ${themeColor}; font-size: 14px;">${data.confidence}% Confidence</span>
+                    </div>
+                    <div style="display: flex; gap: 15px; font-size: 10px; color: #475569;">
+                        <span>Benign Class: <strong>${data.probabilities.benign}%</strong></span>
+                        <span>Malignant Class: <strong>${data.probabilities.malignant}%</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scans Side-by-Side -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                <div style="text-align: center;">
+                    <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 600; color: #475569;">Original Ultrasound Scan</p>
+                    <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; background: #fafafa; display: flex; align-items: center; justify-content: center; height: 230px;">
+                        <img src="${data.original_image}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 600; color: #475569;">CLAHE Enhanced View & Mass Localization</p>
+                    <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; background: #fafafa; display: flex; align-items: center; justify-content: center; height: 230px;">
+                        <img src="${data.processed_image}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clinical Diagnostic Insights -->
+            <div style="margin-bottom: 25px;">
+                <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: #1e3a8a; text-transform: uppercase;">Clinical Findings & Insights</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 12px;">
+                    <div style="background: #f8fafc; border-radius: 6px; padding: 10px; border: 1px solid #f1f5f9;">
+                        <span style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 2px;">BI-RADS Classification</span>
+                        <strong style="color: #0f172a; font-size: 11px;">${birads}</strong>
+                    </div>
+                    <div style="background: #f8fafc; border-radius: 6px; padding: 10px; border: 1px solid #f1f5f9;">
+                        <span style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 2px;">Estimated Tissue Density</span>
+                        <strong style="color: #0f172a; font-size: 11px;">${density}</strong>
+                    </div>
+                </div>
+                <div style="background: #f8fafc; border-radius: 6px; padding: 10px; border: 1px solid #f1f5f9; margin-bottom: 12px;">
+                    <span style="font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 2px;">Acoustic Shadowing Profile</span>
+                    <strong style="color: #0f172a; font-size: 11px; font-weight: 500;">${shadowing}</strong>
+                </div>
+                <div style="background: #eff6ff; border-radius: 6px; padding: 12px; border: 1px solid #dbeafe;">
+                    <strong style="color: #1e40af; font-size: 11px; display: block; margin-bottom: 4px;">AI Diagnostic Rationale & Evidence:</strong>
+                    <p style="margin: 0; color: #1e3a8a; font-size: 11px; text-align: justify; line-height: 1.45;">${rationale}</p>
+                </div>
+            </div>
+
+            <!-- Signal & Noise Quality Evaluation -->
+            <div style="margin-bottom: 25px;">
+                <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: #1e3a8a; text-transform: uppercase;">Clinical Sensor Noise & Signal Integrity Analysis</h3>
+                <div style="background: #f8fafc; border-radius: 6px; padding: 12px; border: 1px solid #f1f5f9; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase;">Dominant Noise Signature:</span>
+                        <strong style="color: #1e3a8a; font-size: 11px;">${dominantType}</strong>
+                    </div>
+                    <p style="margin: 0; font-size: 11px; color: #475569; line-height: 1.45;">${dominantDesc}</p>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+                    <div style="text-align: center; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background: #fafafa;">
+                        <span style="font-size: 9px; color: #64748b; display: block; margin-bottom: 2px;">Signal-to-Noise (SNR)</span>
+                        <strong style="font-size: 13px; color: #0f172a;">${snrDb}</strong>
+                    </div>
+                    <div style="text-align: center; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background: #fafafa;">
+                        <span style="font-size: 9px; color: #64748b; display: block; margin-bottom: 2px;">Acoustic Speckle Level</span>
+                        <strong style="font-size: 13px; color: #0f172a;">${speckleLevel}%</strong>
+                    </div>
+                    <div style="text-align: center; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background: #fafafa;">
+                        <span style="font-size: 9px; color: #64748b; display: block; margin-bottom: 2px;">Thermal Gaussian Level</span>
+                        <strong style="font-size: 13px; color: #0f172a;">${gaussianLevel}%</strong>
+                    </div>
+                    <div style="text-align: center; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background: #fafafa;">
+                        <span style="font-size: 9px; color: #64748b; display: block; margin-bottom: 2px;">Sensor Impulse Level</span>
+                        <strong style="font-size: 13px; color: #0f172a;">${impulseLevel}%</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer & Disclaimer -->
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 35px; text-align: center; color: #64748b; font-size: 9px; line-height: 1.4;">
+                <p style="margin: 0 0 4px 0; font-weight: 600;">CONFIDENTIAL MEDICAL INFORMATION — RESEARCH STUDY ONLY</p>
+                <p style="margin: 0; max-width: 500px; margin-left: auto; margin-right: auto;">Disclaimer: This diagnostic report is generated by a deep neural network prototype for research and evaluation purposes. Decisions relating to clinical patient treatment and malignancy diagnoses should be made by licensed medical practitioners alongside biopsy findings.</p>
+            </div>
+        `;
+
+        const opt = {
+            margin: 0,
+            filename: `OncoVision_Diagnostic_Report_${filename.split('.')[0]}_${new Date().toISOString().slice(0,10)}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        // Generate PDF and log outcome
+        html2pdf().from(reportContainer).set(opt).save().then(() => {
+            addLogEntry('Diagnostic PDF report downloaded successfully.', 'success');
+        }).catch(err => {
+            addLogEntry(`Failed to generate PDF: ${err.message}`, 'error');
+        });
+    }
 });

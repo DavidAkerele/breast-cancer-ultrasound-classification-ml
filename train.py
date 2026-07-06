@@ -66,18 +66,26 @@ def main():
     parser.add_argument("--epochs", type=int, default=config.NUM_EPOCHS, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=config.BATCH_SIZE, help="Batch size")
     parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="Learning rate")
+    parser.add_argument("--combine", type=bool, default=True, help="Combine multiple datasets for training")
     args = parser.parse_args()
 
     print(f"--- Starting Training Pipeline on Device: {config.DEVICE} ---")
     
     # Check if data exists
-    if not os.path.exists(config.TRAIN_DIR) or len(os.listdir(config.TRAIN_DIR)) == 0:
-        print(f"[WARNING] Training directory {config.TRAIN_DIR} is empty or missing.")
-        print("Running dummy data generator so you can verify the pipeline right away...")
-        from create_dummy_data import create_dummy_dataset
-        create_dummy_dataset()
+    if args.combine:
+        breast_dir = os.path.join(config.DATA_DIR, "breast", "train")
+        oasbud_dir = os.path.join(config.DATA_DIR, "oasbud", "train")
+        if (not os.path.exists(breast_dir) or len(os.listdir(breast_dir)) == 0) and \
+           (not os.path.exists(oasbud_dir) or len(os.listdir(oasbud_dir)) == 0):
+            print("[WARNING] Combined training datasets (BrEaST / OASBUD) are empty or missing.")
+    else:
+        if not os.path.exists(config.TRAIN_DIR) or len(os.listdir(config.TRAIN_DIR)) == 0:
+            print(f"[WARNING] Training directory {config.TRAIN_DIR} is empty or missing.")
+            print("Running dummy data generator so you can verify the pipeline right away...")
+            from create_dummy_data import create_dummy_dataset
+            create_dummy_dataset()
 
-    train_loader, val_loader, _, class_weights = get_dataloaders(batch_size=args.batch_size)
+    train_loader, val_loader, _, class_weights = get_dataloaders(batch_size=args.batch_size, combine=args.combine)
     print(f"Loaded {len(train_loader.dataset)} training samples and {len(val_loader.dataset)} validation samples.")
 
     model = get_model(model_name=args.model, num_classes=config.NUM_CLASSES, pretrained=True)

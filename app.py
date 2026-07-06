@@ -63,7 +63,8 @@ def load_model():
 model = load_model()
 
 val_transform = transforms.Compose([
-    transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)),
+    transforms.Resize(config.IMG_SIZE),
+    transforms.CenterCrop(config.IMG_SIZE),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
@@ -112,6 +113,25 @@ with col2:
             img_np = np.array(img_pil)
         else:
             img_np = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+
+        # Interactive ROI Cropping in Sidebar
+        h, w = img_np.shape[:2]
+        min_dim = min(h, w)
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 🎯 Interactive ROI Cropping")
+        st.sidebar.markdown("Define a uniform square region of interest (ROI) enclosing the target lesion.")
+        
+        crop_size = st.sidebar.slider("Square ROI Size (px)", min_value=min(50, min_dim), max_value=min_dim, value=min_dim)
+        
+        max_x = w - crop_size
+        max_y = h - crop_size
+        
+        crop_x = st.sidebar.slider("ROI X Position", min_value=0, max_value=max_x, value=max_x // 2) if max_x > 0 else 0
+        crop_y = st.sidebar.slider("ROI Y Position", min_value=0, max_value=max_y, value=max_y // 2) if max_y > 0 else 0
+        
+        # Crop to selected square ROI
+        img_np = img_np[crop_y:crop_y+crop_size, crop_x:crop_x+crop_size]
 
         enhanced_np = apply_clahe(img_np) if use_clahe else img_np
 

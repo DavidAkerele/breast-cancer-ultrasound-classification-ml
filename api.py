@@ -58,7 +58,8 @@ def load_model_if_needed():
     
     if val_transform is None:
         val_transform = transforms.Compose([
-            transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)),
+            transforms.Resize(config.IMG_SIZE),
+            transforms.CenterCrop(config.IMG_SIZE),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
@@ -165,16 +166,20 @@ def is_valid_medical_scan(img_np: np.ndarray) -> bool:
 def localize_lesion(gray_img: np.ndarray) -> tuple:
     """
     Locates the hypoechoic mass lesion using adaptive thresholding and L2 distance transform.
-    This method guarantees a tight, precise circle fit that avoids acoustic shadowing/enhancement artifacts.
+    This method scales parameters dynamically with the image dimensions for high precision.
     """
     h, w = gray_img.shape
     
-    # 1. Smooth to suppress speckle noise while preserving general mass structure
-    blurred = cv2.GaussianBlur(gray_img, (9, 9), 0)
+    # 1. Smooth to suppress speckle noise relative to the image size
+    ksize = int(min(h, w) * 0.04)
+    if ksize % 2 == 0:
+        ksize += 1
+    ksize = max(5, ksize)
+    blurred = cv2.GaussianBlur(gray_img, (ksize, ksize), 0)
     
     # 2. Find local minimum intensity in the central search region (where masses reside)
     cy, cx = h // 2, w // 2
-    r_search = 50
+    r_search = int(min(h, w) * 0.25)
     sub_region = blurred[max(0, cy-r_search):min(h, cy+r_search), max(0, cx-r_search):min(w, cx+r_search)]
     
     # Adaptive local threshold based on the actual darkest pixel in the region
@@ -185,7 +190,8 @@ def localize_lesion(gray_img: np.ndarray) -> tuple:
     _, mask = cv2.threshold(blurred, thresh_val, 255, cv2.THRESH_BINARY_INV)
     
     # 3. Clean up mask morphology
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    se_size = max(3, int(min(h, w) * 0.02))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (se_size, se_size))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     
@@ -205,11 +211,14 @@ def localize_lesion(gray_img: np.ndarray) -> tuple:
             
             # Scale distance radius to wrap the mass outer border cleanly
             r = int(max_val * 1.6)
-            r = max(15, min(r, 45)) # Clamped to clinical bounds
+            min_r = max(10, int(min(h, w) * 0.05))
+            max_r = int(min(h, w) * 0.3)
+            r = max(min_r, min(r, max_r))
             return int(lx), int(ly), int(r)
             
-    # Fallback to center region with default radius
-    return cx, cy, 25
+    # Fallback to center region with default radius relative to image size
+    fallback_r = int(min(h, w) * 0.12)
+    return cx, cy, fallback_r
 
 
 def draw_lesion_circle(img_np: np.ndarray, prediction: str) -> np.ndarray:
@@ -475,47 +484,46 @@ def get_source_code(filename: str):
 
 # Endpoint to query list of generated validation dataset files with split option
 @app.get("/api/dataset/files")
-def get_dataset_files(split: str = "val"):
+def get_dataset_files(dataset: str = "busi", split: str = "val"):
+    if dataset not in ["busi", "breast", "oasbud"]:
+        raise HTTPException(status_code=400, detail="Invalid dataset.")
     if split not in ["train", "val", "test"]:
         raise HTTPException(status_code=400, detail="Invalid split partition.")
         
-    if split == "train":
-        split_dir = config.TRAIN_DIR
-    elif split == "test":
-        split_dir = config.TEST_DIR
-    else:
-        split_dir = config.VAL_DIR
+    split_dir = os.path.join(config.DATA_DIR, dataset, split)
+    
+    # We support benign, malignant, and normal (only if it exists)
+    allowed_categories = ["benign", "malignant"]
+    if dataset == "breast":
+        allowed_categories.append("normal")
         
     files_list = []
-    for class_name in config.CLASS_NAMES:
+    for class_name in allowed_categories:
         class_dir = os.path.join(split_dir, class_name)
         if os.path.exists(class_dir):
             for fname in sorted(os.listdir(class_dir)):
+                # Filter out masks (files ending with _tumor.png, _other.png etc.)
                 if fname.lower().endswith(('.png', '.jpg', '.jpeg', '.tif')):
-                    files_list.append({
-                        "name": fname,
-                        "class": class_name,
-                        "url": f"/api/dataset/file/{split}/{class_name}/{fname}"
-                    })
+                    if not fname.lower().endswith(('_tumor.png', '_mask.png')):
+                        files_list.append({
+                            "name": fname,
+                            "class": class_name,
+                            "url": f"/api/dataset/file/{split}/{class_name}/{fname}?dataset={dataset}"
+                        })
     return files_list
 
 # Endpoint to serve a specific image file from a dataset split
 @app.get("/api/dataset/file/{split}/{category}/{filename}")
-def get_split_dataset_file(split: str, category: str, filename: str):
+def get_split_dataset_file(split: str, category: str, filename: str, dataset: str = "busi"):
+    if dataset not in ["busi", "breast", "oasbud"]:
+        raise HTTPException(status_code=400, detail="Invalid dataset.")
     if split not in ["train", "val", "test"]:
         raise HTTPException(status_code=400, detail="Invalid split partition.")
-    if category not in config.CLASS_NAMES:
+    if category not in ["benign", "malignant", "normal"]:
         raise HTTPException(status_code=400, detail="Invalid category.")
         
-    if split == "train":
-        split_dir = config.TRAIN_DIR
-    elif split == "test":
-        split_dir = config.TEST_DIR
-    else:
-        split_dir = config.VAL_DIR
-        
     clean_filename = os.path.basename(filename)
-    file_path = os.path.join(split_dir, category, clean_filename)
+    file_path = os.path.join(config.DATA_DIR, dataset, split, category, clean_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Image file not found.")
         

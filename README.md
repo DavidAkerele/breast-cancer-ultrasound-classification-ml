@@ -23,7 +23,7 @@ This guarantees that:
 ### Image Preprocessing (CLAHE)
 Mammogram images often suffer from low contrast. We apply **Contrast Limited Adaptive Histogram Equalization (CLAHE)** with:
 - `clip_limit = 2.0` (prevents over-amplification of noise).
-- `tile_grid_size = (8, 8)` (local area histogram stretching).
+- `tile_grid_size = (16, 16)` (local area histogram stretching).
 
 ---
 

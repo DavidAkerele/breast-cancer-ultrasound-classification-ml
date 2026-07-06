@@ -131,7 +131,7 @@ def build_presentation():
     p1.space_after = Pt(14)
     
     p2 = tf.add_paragraph()
-    p2.text = "• Algorithmic Steps:\n  1. Tiling: Segment input scan into non-overlapping local grids (8x8 tiles).\n  2. Contrast Limiting: Clip localized histograms at threshold 2.0 to suppress noise spikes.\n  3. Equalization: Apply cumulative distribution matching locally.\n  4. Bilinear Interpolation: Eliminate artificial borders between grids."
+    p2.text = "• Algorithmic Steps:\n  1. Tiling: Segment input scan into non-overlapping local grids (16x16 tiles).\n  2. Contrast Limiting: Clip localized histograms at threshold 2.0 to suppress noise spikes.\n  3. Equalization: Apply cumulative distribution matching locally.\n  4. Bilinear Interpolation: Eliminate artificial borders between grids."
     p2.font.name = "Arial"
     p2.font.size = Pt(18)
     p2.font.color.rgb = DARK_TEXT

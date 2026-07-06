@@ -55,7 +55,7 @@ graph TD
 
 ### 3.1 Preprocessing: CLAHE
 Standard Global Histogram Equalization (GHE) stretching often over-amplifies noise and details in uniform regions. We implement **Contrast Limited Adaptive Histogram Equalization (CLAHE)** to process local tiles:
-1. The image is partitioned into non-overlapping contextual regions (tiles) of size $8 \times 8$.
+1. The image is partitioned into non-overlapping contextual regions (tiles) of size $16 \times 16$.
 2. For each tile, a local histogram is computed.
 3. Contrast limiting is applied to clip the histogram height at a clip limit of $2.0$ to avoid noise amplification. The clipped pixels are uniformly redistributed across all histogram bins.
 4. Bilinear interpolation is used to remove artificial boundary edges between neighboring tiles.

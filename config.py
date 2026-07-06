@@ -3,9 +3,10 @@ import torch
 
 # Dataset directory paths
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-TRAIN_DIR = os.path.join(DATA_DIR, "train")
-VAL_DIR = os.path.join(DATA_DIR, "val")
-TEST_DIR = os.path.join(DATA_DIR, "test")
+ACTIVE_DATASET = os.getenv("ACTIVE_DATASET", "busi")
+TRAIN_DIR = os.path.join(DATA_DIR, ACTIVE_DATASET, "train")
+VAL_DIR = os.path.join(DATA_DIR, ACTIVE_DATASET, "val")
+TEST_DIR = os.path.join(DATA_DIR, ACTIVE_DATASET, "test")
 
 # Model checkpoints and outputs
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs")
@@ -33,7 +34,7 @@ EARLY_STOPPING_PATIENCE = 5
 # Preprocessing flag: Enable CLAHE (Contrast Limited Adaptive Histogram Equalization)
 USE_CLAHE = True
 CLAHE_CLIP_LIMIT = 2.0
-CLAHE_TILE_GRID_SIZE = (8, 8)
+CLAHE_TILE_GRID_SIZE = (16, 16)
 
 # Device configuration (auto-detect Apple Silicon MPS, NVIDIA CUDA, or CPU)
 if torch.cuda.is_available():

@@ -2,7 +2,7 @@
 
 ## 3.1 Preprocessing: CLAHE Optimization
 Contrast Limited Adaptive Histogram Equalization (CLAHE) addresses the limitations of standard Global Histogram Equalization (GHE) by operating on localized regions (tiles) and clipping contrast amplification:
-1. **Tiling**: The image is split into a grid of $8 \times 8$ contextual tiles.
+1. **Tiling**: The image is split into a grid of $16 \times 16$ contextual tiles.
 2. **Clipping**: For each tile, the histogram is computed and clipped at a threshold (clip limit = $2.0$). Bins exceeding this limit are redistributed uniformly.
 3. **Equalization**: The cumulative distribution function (CDF) is mapped for local pixel values:
    $$s = T(r) = \int_{0}^{r} p_r(w) dw$$

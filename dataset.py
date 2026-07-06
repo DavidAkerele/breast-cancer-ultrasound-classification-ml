@@ -45,15 +45,26 @@ class BreastUltrasoundDataset(Dataset):
         elif root_dir is not None and os.path.exists(root_dir):
             for class_idx, class_name in enumerate(config.CLASS_NAMES):
                 class_dir = os.path.join(root_dir, class_name)
-                if not os.path.exists(class_dir):
-                    continue
                 # Support common medical image extensions
                 extensions = ('*.png', '*.jpg', '*.jpeg', '*.tif', '*.tiff', '*.bmp', '*.dcm')
                 files = []
-                for ext in extensions:
-                    files.extend(glob.glob(os.path.join(class_dir, ext)))
+                
+                if os.path.exists(class_dir):
+                    for ext in extensions:
+                        files.extend(glob.glob(os.path.join(class_dir, ext)))
+                        
+                # Map normal cases to benign (class_idx = 0)
+                if class_name == "benign":
+                    normal_dir = os.path.join(root_dir, "normal")
+                    if os.path.exists(normal_dir):
+                        for ext in extensions:
+                            files.extend(glob.glob(os.path.join(normal_dir, ext)))
+                            
                 for filepath in sorted(files):
-                    self.samples.append((filepath, class_idx))
+                    fname = os.path.basename(filepath)
+                    # Filter out mask/tumor label files from training/validation scans
+                    if not fname.lower().endswith(('_tumor.png', '_mask.png')):
+                        self.samples.append((filepath, class_idx))
 
     def __len__(self):
         return len(self.samples)
@@ -88,9 +99,11 @@ def get_transforms():
     """
     Returns standard training and validation data transformations.
     Ultrasound scans benefit from random flips and gentle rotations (invariance to orientation).
+    Using Resize and CenterCrop ensures uniform square inputs across all datasets without distorting aspect ratios.
     """
     train_transform = transforms.Compose([
-        transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)),
+        transforms.Resize(config.IMG_SIZE),
+        transforms.CenterCrop(config.IMG_SIZE),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomVerticalFlip(p=0.5),
         transforms.RandomRotation(degrees=15),
@@ -100,23 +113,49 @@ def get_transforms():
     ])
 
     val_transform = transforms.Compose([
-        transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)),
+        transforms.Resize(config.IMG_SIZE),
+        transforms.CenterCrop(config.IMG_SIZE),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     return train_transform, val_transform
 
-def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0):
+def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0, combine=True):
     """
     Creates DataLoaders for train, val, and test splits.
     Also computes class weights for loss balancing if dataset is imbalanced.
     """
     train_transform, val_transform = get_transforms()
 
-    train_dataset = BreastUltrasoundDataset(root_dir=config.TRAIN_DIR, transform=train_transform, use_clahe=config.USE_CLAHE)
-    val_dataset = BreastUltrasoundDataset(root_dir=config.VAL_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
-    test_dataset = BreastUltrasoundDataset(root_dir=config.TEST_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
+    if combine:
+        datasets_to_load = ["breast", "oasbud"]
+        train_samples = []
+        val_samples = []
+        test_samples = []
+        for ds_name in datasets_to_load:
+            train_dir = os.path.join(config.DATA_DIR, ds_name, "train")
+            val_dir = os.path.join(config.DATA_DIR, ds_name, "val")
+            test_dir = os.path.join(config.DATA_DIR, ds_name, "test")
+            
+            if os.path.exists(train_dir):
+                train_ds = BreastUltrasoundDataset(root_dir=train_dir, transform=train_transform, use_clahe=config.USE_CLAHE)
+                train_samples.extend(train_ds.samples)
+            if os.path.exists(val_dir):
+                val_ds = BreastUltrasoundDataset(root_dir=val_dir, transform=val_transform, use_clahe=config.USE_CLAHE)
+                val_samples.extend(val_ds.samples)
+            if os.path.exists(test_dir):
+                test_ds = BreastUltrasoundDataset(root_dir=test_dir, transform=val_transform, use_clahe=config.USE_CLAHE)
+                test_samples.extend(test_ds.samples)
+                
+        train_dataset = BreastUltrasoundDataset(file_list=train_samples, transform=train_transform, use_clahe=config.USE_CLAHE)
+        val_dataset = BreastUltrasoundDataset(file_list=val_samples, transform=val_transform, use_clahe=config.USE_CLAHE)
+        test_dataset = BreastUltrasoundDataset(file_list=test_samples, transform=val_transform, use_clahe=config.USE_CLAHE)
+        print(f"[Dataset] Combined loading: {len(train_samples)} training, {len(val_samples)} validation samples.")
+    else:
+        train_dataset = BreastUltrasoundDataset(root_dir=config.TRAIN_DIR, transform=train_transform, use_clahe=config.USE_CLAHE)
+        val_dataset = BreastUltrasoundDataset(root_dir=config.VAL_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
+        test_dataset = BreastUltrasoundDataset(root_dir=config.TEST_DIR, transform=val_transform, use_clahe=config.USE_CLAHE)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)

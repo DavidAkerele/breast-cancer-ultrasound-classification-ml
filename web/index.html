@@ -28,7 +28,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <div class="app-container">
@@ -553,6 +553,12 @@
                         
                         <div class="noise-compare-inputs">
                             <div class="compare-input-group">
+                                <label>Select Target Scan</label>
+                                <select id="noiseStudySelect" class="select-pill-input dark">
+                                    <option value="" selected>-- Choose patient study --</option>
+                                </select>
+                            </div>
+                            <div class="compare-input-group">
                                 <label>Noise Type</label>
                                 <select id="noiseCompareType" class="select-pill-input dark">
                                     <option value="speckle">Multiplicative Speckle</option>
@@ -672,6 +678,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=6"></script>
 </body>
 </html>

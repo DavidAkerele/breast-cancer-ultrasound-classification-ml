@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const claheToggle = document.getElementById('claheToggle');
     const modelSelect = document.getElementById('modelSelect');
     const existingStudySelect = document.getElementById('existingStudySelect');
+    const noiseStudySelect = document.getElementById('noiseStudySelect');
     const datasetSplitSelect = document.getElementById('datasetSplitSelect');
 
     // Crop Modal Elements
@@ -163,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     fetchServerStatus();
+    loadCodeFile('dataset.py');
 
     let activePredictionData = null;
 
@@ -182,6 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Populate dropdown
                 existingStudySelect.innerHTML = '<option value="" selected>-- Choose patient study --</option>';
+                if (noiseStudySelect) {
+                    noiseStudySelect.innerHTML = '<option value="" selected>-- Choose patient study --</option>';
+                }
                 data.forEach(item => {
                     const option = document.createElement('option');
                     option.value = item.url;
@@ -190,6 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (display_name.includes('?')) display_name = display_name.split('?')[0];
                     option.textContent = `${display_name} (${item.class.toUpperCase()})`;
                     existingStudySelect.appendChild(option);
+                    if (noiseStudySelect) {
+                        const noiseOption = option.cloneNode(true);
+                        noiseStudySelect.appendChild(noiseOption);
+                    }
                 });
 
                 // Populate image gallery
@@ -1028,6 +1037,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    if (noiseStudySelect) {
+        noiseStudySelect.addEventListener('change', async (e) => {
+            const url = e.target.value;
+            if (!url) {
+                if (noiseCleanImg) noiseCleanImg.style.display = 'none';
+                if (noiseCleanPlaceholder) noiseCleanPlaceholder.style.display = 'block';
+                return;
+            }
+            
+            if (existingStudySelect) {
+                existingStudySelect.value = url;
+            }
+            
+            addLogEntry(`Loading study for noise comparison: ${url.substring(url.lastIndexOf('/') + 1)}`, 'info');
+            if (noiseCleanPlaceholder) {
+                noiseCleanPlaceholder.style.display = 'block';
+                noiseCleanPlaceholder.textContent = 'Loading scan...';
+            }
+            if (noiseCleanImg) noiseCleanImg.style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE}${url}`);
+                if (!response.ok) throw new Error('Failed to retrieve scan image');
+                const blob = await response.blob();
+                
+                const reader = new FileReader();
+                reader.onload = (eReader) => {
+                    if (noiseCleanImg) {
+                        noiseCleanImg.src = eReader.target.result;
+                        noiseCleanImg.style.display = 'block';
+                        noiseCleanImg.classList.remove('hidden');
+                    }
+                    if (noiseCleanPlaceholder) noiseCleanPlaceholder.style.display = 'none';
+                    
+                    if (origImgPreview) {
+                        origImgPreview.src = eReader.target.result;
+                    }
+                    
+                    selectedFile = new File([blob], url.substring(url.lastIndexOf('/') + 1), {type: "image/png"});
+                    
+                    if (noiseCorruptedImg) noiseCorruptedImg.style.display = 'none';
+                    if (noiseCorruptedPlaceholder) {
+                        noiseCorruptedPlaceholder.style.display = 'block';
+                        noiseCorruptedPlaceholder.textContent = 'Awaiting comparison execution...';
+                    }
+                    if (noiseCleanVerdict) noiseCleanVerdict.textContent = 'Awaiting comparison...';
+                    if (noiseCleanConfidence) noiseCleanConfidence.textContent = '--';
+                    if (noiseCorruptedVerdict) noiseCorruptedVerdict.textContent = 'Awaiting comparison...';
+                    if (noiseCorruptedConfidence) noiseCorruptedConfidence.textContent = '--';
+                };
+                reader.readAsDataURL(blob);
+            } catch (err) {
+                console.error(err);
+                addLogEntry(`Failed to load scan for noise comparison: ${err.message}`, 'error');
+                if (noiseCleanPlaceholder) noiseCleanPlaceholder.textContent = 'Failed to load scan.';
+            }
+        });
+    }
+
     if (btnRunNoiseCompare) {
         btnRunNoiseCompare.addEventListener('click', async () => {
             if (!origImgPreview || !origImgPreview.src || origImgPreview.src.endsWith('/')) {
@@ -1392,6 +1460,10 @@ Sets up arguments for running predictions directly from the shell terminal.`
             } else {
                 codeCellCount++;
                 cell.className = 'notebook-cell code-cell';
+                
+                const outputs = notebookCellOutputs[fileName] || ["Cell execution completed successfully."];
+                const defaultOutput = outputs[codeCellCount - 1] || "Execution completed.";
+                
                 cell.innerHTML = `
                     <div class="cell-left">
                         <div class="cell-input-prompt">In [${codeCellCount}]:</div>
@@ -1401,10 +1473,10 @@ Sets up arguments for running predictions directly from the shell terminal.`
                     </div>
                     <div class="cell-code-container">
                         <pre><code>${escapeHtml(cellData.content)}</code></pre>
-                        <!-- Colab style output cell -->
-                        <div class="cell-output-container hidden" id="out-${fileName}-${index}">
+                        <!-- Colab style output cell (shown by default!) -->
+                        <div class="cell-output-container" id="out-${fileName}-${index}">
                             <div class="cell-output-header">Output</div>
-                            <pre class="cell-output-text"></pre>
+                            <pre class="cell-output-text">${defaultOutput}</pre>
                         </div>
                     </div>
                 `;
@@ -1419,6 +1491,11 @@ Sets up arguments for running predictions directly from the shell terminal.`
     }
 
     function runCell(cellElement, fileName, cellIndex, codeIndex) {
+        if (codeIndex === undefined) {
+            const codeCells = Array.from(notebookCellsList.querySelectorAll('.notebook-cell.code-cell'));
+            codeIndex = codeCells.indexOf(cellElement) + 1;
+        }
+
         const playBtn = cellElement.querySelector('.cell-play-btn');
         const prompt = cellElement.querySelector('.cell-input-prompt');
         const outputContainer = cellElement.querySelector('.cell-output-container');
@@ -1503,7 +1580,12 @@ Sets up arguments for running predictions directly from the shell terminal.`
         const file = activeFileName ? activeFileName.textContent : '';
         const cells = codeCache[file];
         if (!cells) return;
-        const codeText = cells.join('\n\n');
+        const codeText = cells.map(c => {
+            if (c.type === 'markdown') {
+                return c.content.split('\n').map(line => `# ${line}`).join('\n');
+            }
+            return c.content;
+        }).join('\n\n');
         
         navigator.clipboard.writeText(codeText).then(() => {
             const origText = btnCopyCode ? btnCopyCode.textContent : '';

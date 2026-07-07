@@ -761,39 +761,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function analyzeSample(type) {
         showState('loading');
-        addLogEntry(`Simulating neural execution for benchmark: ${type.toUpperCase()}...`, 'info');
-        
-        setTimeout(() => {
-            const isBenign = (type === 'benign');
-            const conf = isBenign ? 94.60 : 91.80;
-            const bProb = isBenign ? 94.60 : 8.20;
-            const mProb = isBenign ? 5.40 : 91.80;
-
-            const dummySvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224"><rect width="100%" height="100%" fill="%230b0e14"/><circle cx="112" cy="112" r="${isBenign ? 40 : 60}" fill="%23${isBenign ? '10b981' : 'f43f5e'}" opacity="0.6"/><text x="50%" y="50%" fill="white" font-family="sans-serif" font-size="12" text-anchor="middle" dy=".3em">${type.toUpperCase()}</text></svg>`;
-
-            studiesCount++;
-            if (statsStudiesCount) statsStudiesCount.textContent = studiesCount;
-
-            addLogEntry(`Diagnosis completed. Verdict: ${type.toUpperCase()} (${conf}%)`, 'success');
-
-            renderResults({
-                prediction: isBenign ? 'BENIGN' : 'MALIGNANT',
-                confidence: conf,
-                probabilities: { benign: bProb, malignant: mProb },
-                original_image: dummySvg,
-                processed_image: dummySvg,
-                noise_analysis: {
-                    dominant_type: "Speckle Noise (Acoustic)",
-                    description: "Simulated standard acoustic speckling typically seen in clinical breast ultrasound imaging.",
-                    metrics: {
-                        speckle_level: 32.5,
-                        gaussian_level: 12.4,
-                        impulse_level: 1.2,
-                        snr_db: 22.40
-                    }
-                }
-            });
-        }, 800);
+        addLogEntry(`Loading benchmark clinical study (${type.toUpperCase()})...`, 'info');
+        try {
+            const url = `/api/dataset/file/val/${type}/sample_0.png?dataset=busi`;
+            const response = await fetch(`${API_BASE}${url}`);
+            if (!response.ok) throw new Error(`Failed to load ${type} benchmark image`);
+            const blob = await response.blob();
+            const file = new File([blob], `benchmark_${type}.png`, {type: "image/png"});
+            await uploadAndAnalyze(file);
+        } catch (error) {
+            addLogEntry(`Benchmark loading failed: ${error.message}`, 'error');
+            showAlertModal('Benchmark Error', error.message, 'error');
+            showState('empty');
+        }
     }
 
     function renderNoiseAnalysis(noiseData) {
@@ -1127,14 +1107,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Simulation failed on backend server.');
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Simulation failed on backend server.');
                 }
                 
                 const data = await response.json();
                 
                 // Render Clean Reference Results
                 if (noiseCleanImg) {
-                    noiseCleanImg.src = `data:image/png;base64,${data.clean_image}`;
+                    noiseCleanImg.src = data.clean_image;
                     noiseCleanImg.style.display = 'block';
                     noiseCleanImg.classList.remove('hidden');
                 }
@@ -1149,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Render Noisy Corrupted Results
                 if (noiseCorruptedImg) {
-                    noiseCorruptedImg.src = `data:image/png;base64,${data.noisy_image}`;
+                    noiseCorruptedImg.src = data.noisy_image;
                     noiseCorruptedImg.style.display = 'block';
                     noiseCorruptedImg.classList.remove('hidden');
                 }

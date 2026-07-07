@@ -1032,6 +1032,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (noiseCleanImg) {
                 noiseCleanImg.src = origImgPreview.src;
                 noiseCleanImg.style.display = 'block';
+                noiseCleanImg.classList.remove('hidden');
             }
             if (noiseCleanPlaceholder) noiseCleanPlaceholder.style.display = 'none';
         }
@@ -1135,6 +1136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (noiseCleanImg) {
                     noiseCleanImg.src = `data:image/png;base64,${data.clean_image}`;
                     noiseCleanImg.style.display = 'block';
+                    noiseCleanImg.classList.remove('hidden');
                 }
                 if (noiseCleanPlaceholder) noiseCleanPlaceholder.style.display = 'none';
                 
@@ -1149,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (noiseCorruptedImg) {
                     noiseCorruptedImg.src = `data:image/png;base64,${data.noisy_image}`;
                     noiseCorruptedImg.style.display = 'block';
+                    noiseCorruptedImg.classList.remove('hidden');
                 }
                 if (noiseCorruptedPlaceholder) noiseCorruptedPlaceholder.style.display = 'none';
                 

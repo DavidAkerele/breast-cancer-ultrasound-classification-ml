@@ -990,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uiDashboardContainer.classList.remove('hidden');
         notebookContainer.classList.add('hidden');
         noiseCompareContainer.classList.add('hidden');
-        const wrapper = document.querySelector('.dashboard-wrapper');
+        const wrapper = document.querySelector('.workspace-body');
         wrapper.classList.remove('notebook-mode-active');
         wrapper.classList.remove('noise-mode-active');
         addLogEntry('Viewport toggled to UI Diagnostic Dashboard.', 'info');
@@ -1003,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uiDashboardContainer.classList.add('hidden');
         notebookContainer.classList.remove('hidden');
         noiseCompareContainer.classList.add('hidden');
-        const wrapper = document.querySelector('.dashboard-wrapper');
+        const wrapper = document.querySelector('.workspace-body');
         wrapper.classList.add('notebook-mode-active');
         wrapper.classList.remove('noise-mode-active');
         addLogEntry('Viewport toggled to Notebook Code Viewer.', 'info');
@@ -1022,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uiDashboardContainer.classList.add('hidden');
         notebookContainer.classList.add('hidden');
         noiseCompareContainer.classList.remove('hidden');
-        const wrapper = document.querySelector('.dashboard-wrapper');
+        const wrapper = document.querySelector('.workspace-body');
         wrapper.classList.remove('notebook-mode-active');
         wrapper.classList.add('noise-mode-active');
         addLogEntry('Viewport toggled to Noise Comparison Study View.', 'info');

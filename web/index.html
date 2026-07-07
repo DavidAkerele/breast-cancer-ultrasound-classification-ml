@@ -28,7 +28,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
     <div class="app-container">
@@ -583,7 +583,7 @@
                         <div class="compare-scan-card">
                             <h3>1. Clean Reference Scan</h3>
                             <div class="compare-display-frame">
-                                <img id="noiseCleanImg" src="" alt="Clean Reference" class="hidden">
+                                <img id="noiseCleanImg" src="" alt="Clean Reference" style="display: none;">
                                 <div id="noiseCleanPlaceholder" class="compare-placeholder-text">Load or select a patient study in the main tab first</div>
                             </div>
                             
@@ -600,7 +600,7 @@
                         <div class="compare-scan-card">
                             <h3>2. Synthetically Corrupted Scan</h3>
                             <div class="compare-display-frame">
-                                <img id="noiseCorruptedImg" src="" alt="Corrupted Scan" class="hidden">
+                                <img id="noiseCorruptedImg" src="" alt="Corrupted Scan" style="display: none;">
                                 <div id="noiseCorruptedPlaceholder" class="compare-placeholder-text">Awaiting comparison execution...</div>
                             </div>
                             
@@ -678,6 +678,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=9"></script>
 </body>
 </html>

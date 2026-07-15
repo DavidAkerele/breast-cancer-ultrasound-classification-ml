@@ -14,13 +14,26 @@ export interface ModelComparisonResult {
 
 export interface NoiseAnalysis {
   dominant_type: string;
+  description?: string;
   metrics: {
     snr_db: number;
     speckle_level: number;
+    gaussian_level?: number;
+    impulse_level?: number;
     entropy: number;
     mean_intensity: number;
     std_intensity: number;
   };
+}
+
+export interface NoiseSimulationResult {
+  clean_prediction: string;
+  clean_confidence: number;
+  clean_image: string;
+  noisy_prediction: string;
+  noisy_confidence: number;
+  noisy_image: string;
+  explanation: string;
 }
 
 export interface ClinicalReport {

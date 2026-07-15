@@ -1,4 +1,4 @@
-import type { DiagnosticResult, BatchResultItem, DatasetFileItem } from "../types";
+import type { DiagnosticResult, BatchResultItem, DatasetFileItem, NoiseSimulationResult } from "../types";
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -74,3 +74,29 @@ export async function fetchScanFileFromUrl(urlPath: string, filename: string): P
   const blob = await res.blob();
   return new File([blob], filename, { type: blob.type || "image/png" });
 }
+
+export async function simulateNoiseAndPredict(
+  file: File,
+  noiseType: "speckle" | "gaussian" | "impulse",
+  intensity: number,
+  useClahe: boolean = true
+): Promise<NoiseSimulationResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("noise_type", noiseType);
+  formData.append("intensity", intensity.toString());
+  formData.append("use_clahe", useClahe ? "true" : "false");
+
+  const res = await fetch(`${API_BASE_URL}/api/noise/simulate`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Noise stress simulation failed on backend.");
+  }
+
+  return await res.json();
+}
+

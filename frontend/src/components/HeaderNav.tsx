@@ -1,5 +1,5 @@
 import React from "react";
-import { Activity, Cpu, Layers, Terminal, ServerOff, Radio } from "lucide-react";
+import { Activity, Cpu, Layers, Terminal, ServerOff, Radio, Sliders } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface HeaderNavProps {
@@ -16,8 +16,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   deviceInfo,
 }) => {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md transition-all">
-      <div className="w-full flex items-center justify-between px-4 py-3 sm:px-8 xl:px-12">
+    <header className="shrink-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md transition-all">
+      <div className="w-full flex items-center justify-between px-4 py-2 sm:px-6 xl:px-8">
         {/* Brand & Workstation Identifier */}
         <div className="flex items-center gap-3.5">
           <div className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary border border-primary/30 clinical-glow-cyan">
@@ -53,6 +53,18 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           </button>
 
           <button
+            onClick={() => onSelectTab("noise-lab")}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-medium transition-all cursor-pointer ${
+              activeTab === "noise-lab"
+                ? "bg-background text-emerald-400 shadow-sm border border-emerald-500/40 font-semibold clinical-glow-emerald"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sliders className="size-4 text-emerald-400 animate-pulse" />
+            <span>🔬 Acoustic Noise Lab</span>
+          </button>
+
+          <button
             onClick={() => onSelectTab("benchmark")}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-medium transition-all cursor-pointer ${
               activeTab === "benchmark"
@@ -61,7 +73,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             }`}
           >
             <Layers className="size-4" />
-            <span>Multi-Model Benchmark Grid</span>
+            <span>Multi-Model Consensus</span>
           </button>
 
           <button
@@ -104,10 +116,10 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
       </div>
 
       {/* Mobile Tab Bar switcher */}
-      <div className="flex md:hidden border-t border-border bg-secondary/50 px-3 py-2 justify-around">
+      <div className="flex md:hidden border-t border-border bg-secondary/50 px-2 py-2 justify-around gap-1 overflow-x-auto">
         <button
           onClick={() => onSelectTab("diagnostic")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+          className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium shrink-0 ${
             activeTab === "diagnostic" ? "bg-background text-primary font-semibold shadow-xs border border-border" : "text-muted-foreground"
           }`}
         >
@@ -115,17 +127,26 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           <span>Viewport</span>
         </button>
         <button
+          onClick={() => onSelectTab("noise-lab")}
+          className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium shrink-0 ${
+            activeTab === "noise-lab" ? "bg-background text-emerald-400 font-semibold shadow-xs border border-emerald-500/40" : "text-muted-foreground"
+          }`}
+        >
+          <Sliders className="size-3.5" />
+          <span>Noise Lab</span>
+        </button>
+        <button
           onClick={() => onSelectTab("benchmark")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+          className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium shrink-0 ${
             activeTab === "benchmark" ? "bg-background text-primary font-semibold shadow-xs border border-border" : "text-muted-foreground"
           }`}
         >
           <Layers className="size-3.5" />
-          <span>Benchmark</span>
+          <span>Consensus</span>
         </button>
         <button
           onClick={() => onSelectTab("batch")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+          className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium shrink-0 ${
             activeTab === "batch" ? "bg-background text-primary font-semibold shadow-xs border border-border" : "text-muted-foreground"
           }`}
         >

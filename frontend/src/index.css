@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #ecfeff;
+    --foreground: #164e63;
+    --card: #ffffff;
+    --card-foreground: #164e63;
+    --popover: #ffffff;
+    --popover-foreground: #164e63;
+    --primary: #0891b2;
+    --primary-foreground: #ffffff;
+    --secondary: #e8f1f6;
+    --secondary-foreground: #164e63;
+    --muted: #e8f1f6;
+    --muted-foreground: #475569;
+    --accent: #059669;
+    --accent-foreground: #ffffff;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #a5f3fc;
+    --input: #a5f3fc;
+    --ring: #0891b2;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* ui-ux-pro-max & impeccable Deep Clinical Obsidian + Medical Cyan/Emerald */
+    --background: #0b0f19;
+    --foreground: #f8fafc;
+    --card: #111827;
+    --card-foreground: #f8fafc;
+    --popover: #111827;
+    --popover-foreground: #f8fafc;
+    --primary: #22d3ee;
+    --primary-foreground: #080c14;
+    --secondary: #1e293b;
+    --secondary-foreground: #e2e8f0;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #10b981;
+    --accent-foreground: #080c14;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #22d3ee;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/20 selection:text-primary;
+    margin: 0;
+    min-height: 100vh;
+  }
+}
+
+/* Glassmorphism and Clinical Utility Glows */
+.clinical-glass {
+  background: rgba(17, 24, 39, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+}
+
+.clinical-glow-cyan {
+  box-shadow: 0 0 30px -5px rgba(34, 211, 238, 0.22);
+}
+
+.clinical-glow-emerald {
+  box-shadow: 0 0 30px -5px rgba(16, 185, 129, 0.22);
+}
+
+.clinical-glow-destructive {
+  box-shadow: 0 0 30px -5px rgba(239, 68, 68, 0.32);
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}

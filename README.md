@@ -53,8 +53,17 @@ pip install -r requirements.txt
 ```
 
 ### 2. Launch FastAPI Inference Server
-Start the backend API server to load model weights and serve the interactive UI:
+Start the backend API server to load model weights and serve the inference endpoints on port `8000`:
 ```bash
 python api.py
 ```
-Visit **http://localhost:8000** in your browser to interact with the clinical control station.
+
+### 3. Launch Deep Clinical Workstation (Vite + React + shadcn/ui)
+Our modern full-width clinical workstation (`ui-ux-pro-max` Accessible Medical Obsidian design system) runs on port `5173` with full-screen dual-viewport real-time spotlight zoom rendering:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Visit **http://localhost:5173** in your browser to interact with the full-screen clinical control station (`ResNet-50`, `EfficientNet-B0`, `Custom CNN`, and live batch analytics).
+

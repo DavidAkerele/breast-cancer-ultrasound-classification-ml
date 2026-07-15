@@ -2,6 +2,10 @@
 
 This manual provides an overview of the OncoVision Clinical Control Center, detailing the application's interface, its features, and the underlying repository codebase for classifying breast ultrasound (`BUSI`, `BrEaST`, `OASBUD`) and mammography scans.
 
+The system features a dual-layer architecture:
+1. **Deep Clinical Workstation (`frontend/`)**: A modern **Vite + React + TypeScript + shadcn/ui + Tailwind CSS v4** interface running on port `5173` featuring full-width responsive layout (`ui-ux-pro-max` Obsidian & Cyan/Emerald design tokens), real-time instant scan loading, multi-model consensus grid, and live batch analytics.
+2. **High-Performance Inference Backend (`api.py`)**: A **FastAPI + PyTorch** backend running on port `8000` supporting `ResNet-50`, `EfficientNet-B0`, and `Custom CNN` evaluation with `CLAHE` contrast enhancement and biophysical acoustic noise metrics.
+
 ---
 
 ## 🖥️ Web Workstation Interface Guide

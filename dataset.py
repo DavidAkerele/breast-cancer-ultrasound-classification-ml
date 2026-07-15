@@ -129,7 +129,7 @@ def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0, combine=True):
     train_transform, val_transform = get_transforms()
 
     if combine:
-        datasets_to_load = ["breast", "oasbud"]
+        datasets_to_load = ["busi", "breast", "oasbud"]
         train_samples = []
         val_samples = []
         test_samples = []

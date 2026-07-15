@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const notebookCellsList = document.getElementById('notebookCellsList');
     const navItems = document.querySelectorAll('.nav-item');
 
-    const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:8000' : '';
+    const API_BASE = (window.location.protocol === 'file:' || window.location.port === '8080') ? 'http://localhost:8000' : '';
 
     let selectedFile = null;
     let selectedFiles = []; // Holds folder / batch multi-files
@@ -862,7 +862,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const clinicalShadowing = document.getElementById('clinicalShadowing');
         const clinicalSummaryText = document.getElementById('clinicalSummaryText');
 
-        if (data.prediction === 'MALIGNANT') {
+        if (data.clinical_report) {
+            if (clinicalBirads) clinicalBirads.textContent = data.clinical_report.birads;
+            if (clinicalDensity) clinicalDensity.textContent = data.clinical_report.tissue_density;
+            if (clinicalShadowing) clinicalShadowing.textContent = data.clinical_report.acoustic_shadowing;
+            if (clinicalSummaryText) clinicalSummaryText.textContent = data.clinical_report.rationale;
+        } else if (data.prediction === 'MALIGNANT') {
             const biradsCat = data.confidence > 90 ? 'Category 5 - Highly Suggestive of Malignancy' : 'Category 4B - Suspicious Abnormality';
             if (clinicalBirads) clinicalBirads.textContent = biradsCat;
             if (clinicalDensity) clinicalDensity.textContent = 'Spiculated / Microlobulated Margins';
@@ -878,6 +883,43 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clinicalSummaryText) {
                 clinicalSummaryText.textContent = `The neural network identified a well-circumscribed oval mass with smooth margins and posterior acoustic enhancement (high sound transmission). These features represent a low-attenuation fluid-filled cyst or benign fibroadenoma, suggesting a benign pathology.`;
             }
+        }
+
+        // Render multi-model comparison if available
+        if (data.multi_model_comparison) {
+            const modelsMap = {
+                'resnet50': { predId: 'cmpResnetPred', barId: 'cmpResnetBar', valId: 'cmpResnetVal' },
+                'efficientnet_b0': { predId: 'cmpEfficientnetPred', barId: 'cmpEfficientnetBar', valId: 'cmpEfficientnetVal' },
+                'custom_cnn': { predId: 'cmpCustomCnnPred', barId: 'cmpCustomCnnBar', valId: 'cmpCustomCnnVal' }
+            };
+            Object.keys(modelsMap).forEach(mKey => {
+                const mData = data.multi_model_comparison[mKey];
+                if (mData) {
+                    const pEl = document.getElementById(modelsMap[mKey].predId);
+                    const bEl = document.getElementById(modelsMap[mKey].barId);
+                    const vEl = document.getElementById(modelsMap[mKey].valId);
+                    if (pEl) {
+                        pEl.textContent = mData.prediction;
+                        pEl.className = 'm-prediction ' + (mData.prediction === 'MALIGNANT' ? 'malignant' : 'benign');
+                    }
+                    if (vEl) vEl.textContent = `${mData.confidence}%`;
+                    if (bEl) {
+                        setTimeout(() => { bEl.style.width = `${mData.confidence}%`; }, 100);
+                    }
+                }
+            });
+        }
+
+        // Handle lesion boundary checkbox
+        const toggleCircle = document.getElementById('toggleLesionCircle');
+        if (toggleCircle && claheImgPreview) {
+            toggleCircle.onchange = () => {
+                if (toggleCircle.checked) {
+                    claheImgPreview.src = data.processed_image;
+                } else {
+                    claheImgPreview.src = data.original_image;
+                }
+            };
         }
 
         // Render noise analysis
@@ -1773,4 +1815,42 @@ Sets up arguments for running predictions directly from the shell terminal.`
             addLogEntry(`Failed to generate PDF: ${err.message}`, 'error');
         });
     }
+
+    window.openRoiCropper = () => {
+        if (!activePredictionData || !activePredictionData.original_image) {
+            addLogEntry('No scan loaded for ROI cropping.', 'warning');
+            return;
+        }
+        openCropperModal(activePredictionData.original_image, 'roi_scan.png', (croppedBlob, croppedDataUrl) => {
+            selectedFile = new File([croppedBlob], 'roi_scan.png', {type: "image/png"});
+            addLogEntry('ROI cropped successfully. Running analysis on new ROI...', 'info');
+            if (analyzeBtn && !analyzeBtn.disabled) {
+                analyzeBtn.click();
+            } else {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                const modelKey = modelSelect ? modelSelect.value : 'resnet50';
+                const useClahe = typeof useClaheToggle !== 'undefined' && useClaheToggle ? useClaheToggle.checked : true;
+                fetch(`${API_BASE}/predict?model=${modelKey}&apply_clahe=${useClahe}`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        addLogEntry(`Error on ROI: ${data.error}`, 'error');
+                    } else {
+                        renderResults(data);
+                        addLogEntry('ROI analysis completed successfully.', 'success');
+                    }
+                })
+                .catch(err => addLogEntry(`Failed to analyze ROI: ${err}`, 'error'));
+            }
+        });
+    };
+
+    window.exportDiagnosticReportPDF = () => {
+        if (activePredictionData) generatePDFReport(activePredictionData);
+        else addLogEntry('No diagnostic data to export.', 'warning');
+    };
 });

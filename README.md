@@ -1,50 +1,60 @@
-# Breast Cancer Mammography Classification Framework
+# Breast & Ultrasound Lesion Classification Framework
 
-An interactive web-based suite and machine learning pipeline developed for academic research on classifying breast cancer mammography scans into **Benign** and **Malignant** classes. 
+An advanced, interactive medical computer-aided detection (CAD) suite and deep learning pipeline designed for academic research on classifying breast ultrasound and mammography scans into **Benign** and **Malignant** categories.
 
-This repository implements Contrast Limited Adaptive Histogram Equalization (CLAHE) to amplify subtle anatomical densities, paired with deep Convolutional Neural Networks (CNNs) in PyTorch.
+The framework supports multi-source medical imaging datasets (**BUSI**, **BrEaST**, and **OASBUD**), integrating Contrast Limited Adaptive Histogram Equalization (CLAHE), **Spotlight & 2.5X Magnified Zoom Lenses**, and biophysical noise evaluation with deep Convolutional Neural Networks (CNNs) in PyTorch.
 
 ---
 
 ## 🔬 Scientific Methodology & Model Backbones
 
-To achieve optimal diagnostic accuracy on mammography scans, this framework implements three model architectures:
-1. **EfficientNet-B0** (Transfer Learning): 95.5% Validation Accuracy | 0.984 AUC-ROC
-2. **ResNet-50** (Transfer Learning): 94.2% Validation Accuracy | 0.978 AUC-ROC
-3. **Custom 4-Block CNN Baseline** (Scratch): 88.7% Validation Accuracy | 0.912 AUC-ROC
+To achieve optimal diagnostic sensitivity and specificity on complex medical scans, this framework implements three neural backbones:
+1. **EfficientNet-B0** (Compound Scaled Transfer Learning): High-efficiency feature extraction (`~95.5%` Val Acc | `0.984` AUC-ROC).
+2. **ResNet-50** (Deep Residual Transfer Learning): High-capacity deep feature representation (`~94.2%` Val Acc | `0.978` AUC-ROC).
+3. **Custom 4-Block CNN Baseline** (Trained from Scratch): Localized low-level texture pattern learning (`~88.7%` Val Acc | `0.912` AUC-ROC).
 
-### Mutual Exclusion & Softmax Constraints
-A primary design requirement in medical computer-aided detection (CAD) is that a single scan cannot be classified as both benign and malignant concurrently. The system implements a **Softmax layer** at the model's logits output:
-$$\text{Softmax}(z_i) = \frac{e^{z_i}}{\sum_{j} e^{z_j}}$$
-This guarantees that:
-- The outputs represent a mutually exclusive probability distribution: $P(\text{Benign}) + P(\text{Malignant}) = 1.0 \ (100\%)$.
-- The visualizer displays these as class probabilities rather than anatomical markers to prevent clinical misinterpretation.
+### ⚡ Live Multi-Model Backbone Comparison
+During diagnostic inference, all three model architectures execute in parallel or cached evaluation to provide real-time cross-evaluation (`ResNet-50` vs. `EfficientNet-B0` vs. `Custom CNN`). This allows clinical researchers to verify consensus between residual transfer learning and baseline architectures.
 
-### Image Preprocessing (CLAHE)
-Mammogram images often suffer from low contrast. We apply **Contrast Limited Adaptive Histogram Equalization (CLAHE)** with:
-- `clip_limit = 2.0` (prevents over-amplification of noise).
-- `tile_grid_size = (16, 16)` (local area histogram stretching).
+### 🎯 Spotlight & 2.5X Magnified Zoom Lens Visualizer
+Instead of simple static bounding circles, the visualizer generates a clinical **Spotlight & Magnified Zoom Lens**:
+- **Radial Spotlight Vignette**: Softens background tissue outside the region of interest while highlighting localized lesion margins with target brackets (`┌ ┐ └ ┘`) and a central crosshair (`+`).
+- **Picture-in-Picture 2.5X Zoom Lens**: Extracts a high-resolution `160x160` sharpened inset view (`2.5X ZOOM ROI`) directly on the scan to allow detailed inspection of micro-calcifications and border irregularities without zooming the entire viewport.
+
+### 📐 Mathematical & Biophysical Noise Estimation
+Ultrasonic transducers and imaging sensors introduce acoustic and thermal artifacts that impact diagnosis. The system calculates real-time biophysical metrics:
+- **Acoustic Speckle Level (%)**: Measures multiplicative granular speckle variance across local $16 \times 16$ blocks.
+- **Thermal (Gaussian) Noise (%)**: Evaluates background high-frequency thermal sensor fluctuations.
+- **Impulse (Salt & Pepper) (%)**: Checks for extreme black/white pixel dropouts.
+- **Signal-to-Noise Ratio (SNR dB)**: Computes $20 \log_{10}(\mu / \sigma)$ to quantify overall scan clarity and acoustic shadow density.
+
+### 📋 Clinical BI-RADS Diagnostics Report
+Inference automatically generates a structured diagnostic report with:
+- **BI-RADS Classification**: Automatically categorized (`Category 2 - Benign Routine Screening` vs. `Category 4C/5 - High Suspicion of Malignancy`).
+- **Estimated Tissue Density**: Categorized based on speckle profile (`ACR B` vs. `ACR C - Heterogeneously Dense`).
+- **Acoustic Shadowing Profile & Diagnostic Rationale**: Contextual summary explaining model confidence and acoustic boundary properties.
 
 ---
 
-## 💻 Web Control Panel Features
-- **UI Diagnostics**: Upload single scans, toggle CLAHE previews side-by-side, and inspect probability distributions.
-- **Batch Evaluation**: Drag & drop folders containing multiple mammograms. The interface compiles a summary table showing predicted class tallies and individual verdicts. Clicking any row loads that scan's detailed visualization graphs.
-- **Google Colab Notebook Viewer**: Switch modes to review, play, and run the Python codebase cells directly inside the browser workspace.
+## 💻 Workstation & Web Dashboard Features
+- **Interactive ROI Cropper**: Draw custom bounding boxes directly on any ultrasound study to isolate focal regions.
+- **Dual DICOM Viewport**: Inspect the original raw DICOM/PNG study side-by-side with the CLAHE-preprocessed Spotlight & Zoom lens view.
+- **Batch Dataset Evaluation**: Drag & drop entire folders containing multiple scans (`PNG`, `JPG`, `TIFF`, `DICOM`). The system compiles a summary table showing total tallies (`Benign` vs. `Malignant`) and allows clicking any row to inspect individual spotlight diagnostics.
+- **Colab Code & Notebook Viewer**: Switch modes to inspect, run, and copy Python backend source cells directly inside the browser workspace.
 
 ---
 
-## 🚀 Execution & Setup
+## 🚀 Setup & Execution
 
 ### 1. Installation
-Install the pinned PyTorch and medical imaging packages:
+Install the required PyTorch and medical computer vision dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Launch FastAPI Server
-Run the backend web API to serve the control panel and load the model checkpoints:
+### 2. Launch FastAPI Inference Server
+Start the backend API server to load model weights and serve the interactive UI:
 ```bash
 python api.py
 ```
-Visit **http://localhost:8000** in your browser to interact with the dashboard.
+Visit **http://localhost:8000** in your browser to interact with the clinical control station.

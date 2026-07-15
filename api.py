@@ -514,6 +514,7 @@ async def predict_ultrasound(
         "probabilities": {k: round(v * 100, 2) for k, v in prob_dict.items()},
         "original_image": original_b64,
         "processed_image": processed_b64,
+        "spotlight_zoom_base64": processed_b64,
         "used_clahe": use_clahe,
         "noise_analysis": noise_analysis,
         "multi_model_comparison": multi_comparison,

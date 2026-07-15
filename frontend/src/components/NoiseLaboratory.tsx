@@ -22,6 +22,14 @@ interface NoiseLaboratoryProps {
   onNewLog: (type: "INFO" | "DIAGNOSIS" | "ERROR", msg: string, data?: any) => void;
 }
 
+const getBase64Src = (imgData?: string | null) => {
+  if (!imgData) return "";
+  if (imgData.startsWith("data:image") || imgData.startsWith("http://") || imgData.startsWith("https://") || imgData.startsWith("blob:") || imgData.startsWith("/")) {
+    return imgData;
+  }
+  return `data:image/png;base64,${imgData}`;
+};
+
 export const NoiseLaboratory: React.FC<NoiseLaboratoryProps> = ({ onNewLog }) => {
   const [activeDataset, setActiveDataset] = useState<"busi" | "breast" | "oasbud">("busi");
   const [datasetItems, setDatasetItems] = useState<DatasetFileItem[]>([]);
@@ -403,12 +411,12 @@ export const NoiseLaboratory: React.FC<NoiseLaboratoryProps> = ({ onNewLog }) =>
             <div className="relative flex-1 min-h-0 my-1.5 rounded-lg overflow-hidden bg-black/95 border border-border/80 flex items-center justify-center shadow-inner group">
               {result ? (
                 <img
-                  src={`data:image/png;base64,${result.clean_image}`}
+                  src={getBase64Src(result.clean_image)}
                   alt="Clean Reference"
                   className="max-w-full max-h-full object-contain transition-all duration-500"
                 />
               ) : previewUrl ? (
-                <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+                <img src={getBase64Src(previewUrl)} alt="Preview" className="max-w-full max-h-full object-contain" />
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                   <Volume2 className="size-6 text-primary/40 animate-pulse" />
@@ -439,12 +447,12 @@ export const NoiseLaboratory: React.FC<NoiseLaboratoryProps> = ({ onNewLog }) =>
             <div className="relative flex-1 min-h-0 my-1.5 rounded-lg overflow-hidden bg-black/95 border border-emerald-500/40 flex items-center justify-center shadow-inner group">
               {result ? (
                 <img
-                  src={`data:image/png;base64,${result.noisy_image}`}
+                  src={getBase64Src(result.noisy_image)}
                   alt="Noisy Study"
                   className="max-w-full max-h-full object-contain transition-all duration-500 contrast-125"
                 />
               ) : previewUrl ? (
-                <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain opacity-80" />
+                <img src={getBase64Src(previewUrl)} alt="Preview" className="max-w-full max-h-full object-contain opacity-80" />
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                   <Activity className="size-6 text-emerald-400/40 animate-pulse" />

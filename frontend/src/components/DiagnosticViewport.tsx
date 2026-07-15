@@ -14,6 +14,14 @@ interface DiagnosticViewportProps {
   onUpdateBenchmarkData?: (data: DiagnosticResult) => void;
 }
 
+const getBase64Src = (imgData?: string | null) => {
+  if (!imgData) return "";
+  if (imgData.startsWith("data:image") || imgData.startsWith("http://") || imgData.startsWith("https://") || imgData.startsWith("blob:") || imgData.startsWith("/")) {
+    return imgData;
+  }
+  return `data:image/png;base64,${imgData}`;
+};
+
 export const DiagnosticViewport: React.FC<DiagnosticViewportProps> = ({
   onNewLog,
   onUpdateBenchmarkData,
@@ -267,19 +275,19 @@ export const DiagnosticViewport: React.FC<DiagnosticViewportProps> = ({
                 </div>
               ) : result && showSpotlight && result.spotlight_zoom_base64 ? (
                 <img
-                  src={`data:image/png;base64,${result.spotlight_zoom_base64}`}
+                  src={getBase64Src(result.spotlight_zoom_base64)}
                   alt="Spotlight Zoom"
                   className="max-w-full max-h-full object-contain transition-all duration-300"
                 />
               ) : result ? (
                 <img
-                  src={`data:image/png;base64,${result.processed_image}`}
+                  src={getBase64Src(result.processed_image || result.original_image)}
                   alt="Processed Study"
                   className="max-w-full max-h-full object-contain transition-all duration-300"
                 />
               ) : previewUrl ? (
                 <img
-                  src={previewUrl}
+                  src={getBase64Src(previewUrl)}
                   alt="Preview"
                   className="max-w-full max-h-full object-contain opacity-80 transition-all duration-300"
                 />
@@ -318,13 +326,13 @@ export const DiagnosticViewport: React.FC<DiagnosticViewportProps> = ({
                 </div>
               ) : result ? (
                 <img
-                  src={`data:image/png;base64,${result.processed_image}`}
+                  src={getBase64Src(result.processed_image || result.original_image)}
                   alt="Extracted Tensor"
                   className="max-w-full max-h-full object-contain contrast-125 filter transition-all duration-300"
                 />
               ) : previewUrl ? (
                 <img
-                  src={previewUrl}
+                  src={getBase64Src(previewUrl)}
                   alt="Preview"
                   className="max-w-full max-h-full object-contain opacity-50 filter contrast-150"
                 />

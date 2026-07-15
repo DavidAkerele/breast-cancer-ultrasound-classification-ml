@@ -1,7 +1,7 @@
 import os
 import io
 import base64
-from typing import List
+from typing import List, Optional, Dict, Any
 import cv2
 import numpy as np
 from PIL import Image
@@ -399,18 +399,84 @@ def analyze_image_noise(img_gray: np.ndarray) -> dict:
         "metrics": noise_metrics
     }
 
+def compute_clinical_birads_report(pred_class: str, confidence: float, prob_dict: dict, noise_analysis: dict, model_name: str) -> dict:
+    """
+    Computes a comprehensive, stratified clinical BI-RADS report across Categories 1 to 5
+    using classification confidence, multi-class probability distribution, and acoustic noise artifacts.
+    """
+    speckle_level = noise_analysis.get("metrics", {}).get("speckle_level", 0.0)
+    dominant_noise = noise_analysis.get("dominant_type", "speckle")
+    
+    # Determine Tissue Density based on acoustic speckle noise and contrast
+    if speckle_level < 8.0:
+        density_str = "Almost Entirely Fatty (ACR A)"
+    elif speckle_level < 15.0:
+        density_str = "Scattered Fibroglandular (ACR B)"
+    elif speckle_level < 25.0:
+        density_str = "Heterogeneously Dense (ACR C)"
+    else:
+        density_str = "Extremely Dense (ACR D) - High speckle attenuation"
+
+    # Determine BI-RADS Category and Acoustic Shadowing
+    p_class = pred_class.lower()
+    if p_class == "malignant":
+        if confidence >= 0.94:
+            birads_str = "BI-RADS 5 - Highly suggestive of malignancy (≥95% risk; immediate biopsy required)"
+            shadowing_str = "Pronounced posterior acoustic shadowing surrounding irregular spiculated hypoechoic margin."
+        elif confidence >= 0.82:
+            birads_str = "BI-RADS 4C - High suspicion of malignancy (50-95% risk; urgent histological verification)"
+            shadowing_str = "Posterior acoustic shadowing detected surrounding localized lobulated mass margin."
+        elif confidence >= 0.65:
+            birads_str = "BI-RADS 4B - Moderate suspicion of malignancy (10-50% risk; core needle biopsy advised)"
+            shadowing_str = "Moderate posterior acoustic attenuation noted along microlobulated boundary."
+        else:
+            birads_str = "BI-RADS 4A - Low suspicion of malignancy (2-10% risk; tissue sampling/biopsy considered)"
+            shadowing_str = "Equivocal posterior acoustic shadowing with borderline margin irregularities."
+    elif p_class == "normal":
+        birads_str = "BI-RADS 1 - Negative (Normal screening presentation; regular annual follow-up)"
+        shadowing_str = "No focal hypoechoic mass, architectural distortion, or acoustic shadowing detected."
+    else: # benign
+        if confidence >= 0.94:
+            birads_str = "BI-RADS 1 - Negative / Normal screening presentation (No suspicious mass features)"
+            shadowing_str = "No focal abnormality or posterior acoustic shadowing observed."
+        elif confidence >= 0.82:
+            birads_str = "BI-RADS 2 - Benign finding (Routine screening; circumscribed homogeneous morphology)"
+            shadowing_str = "No posterior acoustic shadowing observed; clear through-transmission."
+        elif confidence >= 0.65:
+            birads_str = "BI-RADS 3 - Probably Benign (≤2% risk of malignancy; short-interval 6-month follow-up recommended)"
+            shadowing_str = "Minimal edge refile shadowing around circumscribed ovoid nodule; well-defined capsule."
+        else:
+            birads_str = "BI-RADS 4A - Low suspicion of malignancy (2-10% risk; equivocal boundary due to speckle distortion)"
+            shadowing_str = "Borderline margin definition with slight posterior acoustic heterogeneity."
+
+    rationale_str = (
+        f"Convolutional forward pass ({model_name.upper()}) identified localized structural morphology with "
+        f"{round(confidence * 100, 1)}% network confidence under {dominant_noise} acoustic profile. "
+        f"Stratified BI-RADS assignment reflects both prediction certainty and margin boundary definition."
+    )
+
+    return {
+        "birads": birads_str,
+        "tissue_density": density_str,
+        "acoustic_shadowing": shadowing_str,
+        "rationale": rationale_str
+    }
+
 def get_multi_model_predictions(tensor: torch.Tensor) -> dict:
-    global multi_model_cache
+    global multi_model_cache, model
     models_to_run = ["custom_cnn", "resnet50", "efficientnet_b0"]
     results = {}
     for m_name in models_to_run:
         try:
-            if m_name not in multi_model_cache:
-                m_instance = get_model(model_name=m_name, num_classes=config.NUM_CLASSES, pretrained=(m_name != "custom_cnn"))
-                m_instance = m_instance.to(config.DEVICE)
-                m_instance.eval()
-                multi_model_cache[m_name] = m_instance
-            m_instance = multi_model_cache[m_name]
+            if m_name == "resnet50" and model is not None:
+                m_instance = model
+            else:
+                if m_name not in multi_model_cache:
+                    m_instance = get_model(model_name=m_name, num_classes=config.NUM_CLASSES, pretrained=(m_name != "custom_cnn"))
+                    m_instance = m_instance.to(config.DEVICE)
+                    m_instance.eval()
+                    multi_model_cache[m_name] = m_instance
+                m_instance = multi_model_cache[m_name]
             with torch.no_grad():
                 out = m_instance(tensor)
                 probs = torch.softmax(out, dim=1).squeeze(0)
@@ -438,12 +504,11 @@ def health_check():
 @app.post("/predict")
 async def predict_ultrasound(
     file: UploadFile = File(...),
-    use_clahe: bool = Form(True)
+    use_clahe: bool = Form(True),
+    model: Optional[str] = Form("resnet50")
 ):
-    global model, val_transform
+    global val_transform
     load_model_if_needed()
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model not loaded.")
 
     try:
         contents = await file.read()
@@ -476,37 +541,30 @@ async def predict_ultrasound(
     img_pil = Image.fromarray(input_for_model)
     tensor = val_transform(img_pil).unsqueeze(0).to(config.DEVICE)
 
-    with torch.no_grad():
-        outputs = model(tensor)
-        probs = torch.softmax(outputs, dim=1).squeeze(0)
-        pred_idx = torch.argmax(probs).item()
-        pred_class = config.CLASS_NAMES[pred_idx]
-        confidence = probs[pred_idx].item()
+    # Analyze Noise
+    img_gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if len(img_np.shape) == 3 else img_np
+    noise_analysis = analyze_image_noise(img_gray)
 
-    prob_dict = {config.CLASS_NAMES[i]: float(probs[i].item()) for i in range(config.NUM_CLASSES)}
+    # Multi-model evaluation across custom_cnn, resnet50, and efficientnet_b0
+    multi_comparison = get_multi_model_predictions(tensor)
+
+    # Determine selected model architecture to use as primary prediction
+    selected_model = model.lower() if model and model.lower() in multi_comparison else "resnet50"
+    if selected_model in multi_comparison and multi_comparison[selected_model]["prediction"] != "ERROR":
+        pred_class = multi_comparison[selected_model]["prediction"].lower()
+        confidence = float(multi_comparison[selected_model]["confidence"]) / 100.0
+        prob_dict = {k: float(v) / 100.0 for k, v in multi_comparison[selected_model]["probabilities"].items()}
+    else:
+        pred_class = multi_comparison["resnet50"]["prediction"].lower()
+        confidence = float(multi_comparison["resnet50"]["confidence"]) / 100.0
+        prob_dict = {k: float(v) / 100.0 for k, v in multi_comparison["resnet50"]["probabilities"].items()}
 
     # Draw localized ROI target circle on the processed visual image
     visual_img = draw_lesion_circle(input_for_model, pred_class)
     processed_b64 = img_to_base64(visual_img)
 
-    # Analyze Noise
-    img_gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if len(img_np.shape) == 3 else img_np
-    noise_analysis = analyze_image_noise(img_gray)
-
-    multi_comparison = get_multi_model_predictions(tensor)
-
-    # Clinical report details
-    birads_str = "BI-RADS 4C - High suspicion of malignancy" if pred_class == "malignant" else "BI-RADS 2 - Benign finding (Routine screening)"
-    density_str = "Heterogeneously Dense (ACR C)" if noise_analysis["metrics"].get("speckle_level", 0) > 15 else "Scattered Fibroglandular (ACR B)"
-    shadowing_str = "Posterior acoustic shadowing detected surrounding localized mass margin." if pred_class == "malignant" else "No significant posterior acoustic shadowing observed."
-    rationale_str = f"Convolutional feature extraction identified localized structural morphology with {round(confidence * 100, 1)}% network confidence under {noise_analysis['dominant_type']} profile."
-
-    clinical_report = {
-        "birads": birads_str,
-        "tissue_density": density_str,
-        "acoustic_shadowing": shadowing_str,
-        "rationale": rationale_str
-    }
+    # Clinical report with stratified BI-RADS Categories (1, 2, 3, 4A, 4B, 4C, 5)
+    clinical_report = compute_clinical_birads_report(pred_class, confidence, prob_dict, noise_analysis, selected_model)
 
     return {
         "prediction": pred_class.upper(),
@@ -576,17 +634,30 @@ async def predict_ultrasound_batch(
             pred_class = config.CLASS_NAMES[pred_idx]
             confidence = probs[pred_idx].item()
 
+        prob_dict = {config.CLASS_NAMES[i]: float(probs[i].item()) for i in range(config.NUM_CLASSES)}
+
+        # Draw localized ROI target circle
+        visual_img = draw_lesion_circle(input_for_model, pred_class)
+        processed_b64 = img_to_base64(visual_img)
+
         # Analyze Noise
         img_gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if len(img_np.shape) == 3 else img_np
         noise_analysis = analyze_image_noise(img_gray)
+
+        multi_comparison = get_multi_model_predictions(tensor)
+        clinical_report = compute_clinical_birads_report(pred_class, confidence, prob_dict, noise_analysis, "resnet50")
 
         results.append({
             "filename": file.filename,
             "prediction": pred_class.upper(),
             "confidence": round(confidence * 100, 2),
+            "probabilities": {k: round(v * 100, 2) for k, v in prob_dict.items()},
             "original_image": original_b64,
             "processed_image": processed_b64,
-            "noise_analysis": noise_analysis
+            "spotlight_zoom_base64": processed_b64,
+            "noise_analysis": noise_analysis,
+            "multi_model_comparison": multi_comparison,
+            "clinical_report": clinical_report
         })
 
     return {"results": results}

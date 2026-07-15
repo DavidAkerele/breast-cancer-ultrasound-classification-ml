@@ -387,18 +387,32 @@ export const DiagnosticViewport: React.FC<DiagnosticViewportProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded-lg bg-secondary/50 border border-border/60 flex flex-col">
+                  <div className="p-2 rounded-lg bg-secondary/50 border border-border/60 flex flex-col justify-center min-w-0">
                     <span className="text-[9px] text-muted-foreground uppercase font-semibold">BI-RADS Category</span>
-                    <span className="text-xs font-bold text-foreground mt-0.5 truncate">
+                    <span
+                      className="text-xs font-bold text-foreground mt-0.5 leading-tight line-clamp-2"
+                      title={
+                        typeof result.clinical_report === "object" && result.clinical_report?.birads
+                          ? result.clinical_report.birads
+                          : result.prediction.toUpperCase() === "MALIGNANT" ? "Category 4C (Suspicious)" : "Category 2 (Benign)"
+                      }
+                    >
                       {typeof result.clinical_report === "object" && result.clinical_report?.birads
                         ? result.clinical_report.birads
                         : result.prediction.toUpperCase() === "MALIGNANT" ? "Category 4C (Suspicious)" : "Category 2 (Benign)"}
                     </span>
                   </div>
 
-                  <div className="p-2 rounded-lg bg-secondary/50 border border-border/60 flex flex-col">
+                  <div className="p-2 rounded-lg bg-secondary/50 border border-border/60 flex flex-col justify-center min-w-0">
                     <span className="text-[9px] text-muted-foreground uppercase font-semibold">Acoustic Density</span>
-                    <span className="text-xs font-bold text-foreground mt-0.5 truncate">
+                    <span
+                      className="text-xs font-bold text-foreground mt-0.5 leading-tight line-clamp-2"
+                      title={
+                        typeof result.clinical_report === "object" && result.clinical_report?.tissue_density
+                          ? result.clinical_report.tissue_density
+                          : result.prediction.toUpperCase() === "MALIGNANT" ? "ACR Type C (Heterogeneous)" : "ACR Type B (Fibroglandular)"
+                      }
+                    >
                       {typeof result.clinical_report === "object" && result.clinical_report?.tissue_density
                         ? result.clinical_report.tissue_density
                         : result.prediction.toUpperCase() === "MALIGNANT" ? "ACR Type C (Heterogeneous)" : "ACR Type B (Fibroglandular)"}
@@ -407,7 +421,14 @@ export const DiagnosticViewport: React.FC<DiagnosticViewportProps> = ({
                 </div>
 
                 {result.clinical_report && (
-                  <div className="p-2 rounded-lg bg-primary/10 border border-primary/30 text-[10px] leading-tight text-foreground/90 font-sans truncate shrink-0">
+                  <div
+                    className="p-2 rounded-lg bg-primary/10 border border-primary/30 text-[10px] leading-tight text-foreground/90 font-sans line-clamp-2 shrink-0"
+                    title={
+                      typeof result.clinical_report === "string"
+                        ? result.clinical_report
+                        : result.clinical_report?.rationale || "Deep CNN feature analysis evaluated structural acoustic boundaries."
+                    }
+                  >
                     <strong className="text-primary uppercase font-mono mr-1">Rationale:</strong>
                     {typeof result.clinical_report === "string"
                       ? result.clinical_report

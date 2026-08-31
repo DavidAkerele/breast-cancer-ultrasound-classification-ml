@@ -1,0 +1,69 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{microtype}
+\usepackage[square,authoryear]{natbib}
+\setcitestyle{authoryear,open={[},close={]},aysep={}}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+    pdftitle={Breast Cancer Ultrasound Classification Using Machine Learning},
+    pdfauthor={Akerele David Damilola}
+}
+
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+    \centering
+    \vspace*{1.5cm}
+    {\Huge \bfseries BREAST CANCER ULTRASOUND CLASSIFICATION USING MACHINE LEARNING \par}
+    \vspace{1.2cm}
+    {\Large A DISSERTATION SUBMITTED TO MANCHESTER METROPOLITAN UNIVERSITY\\ FOR THE DEGREE OF MASTER OF SCIENCE\\ IN THE FACULTY OF SCIENCE AND ENGINEERING \par}
+    \vspace{1.5cm}
+    \includegraphics[width=0.35\textwidth]{figures/fig1_4stage_matrix.png}\par
+    \vspace{1.2cm}
+    {\large \bfseries 2026 \par}
+    \vspace{0.8cm}
+    {\large By\\ \bfseries Akerele David Damilola \\ Department of Computing and Mathematics \par}
+\end{titlepage}
+
+\pagenumbering{roman}
+\input{abstract.tex}
+\input{declaration.tex}
+\input{acknowledgements.tex}
+\input{abbreviations.tex}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\clearpage
+\pagenumbering{arabic}
+
+\input{chapters/chapter1.tex}
+\input{chapters/chapter2.tex}
+\input{chapters/chapter3.tex}
+\input{chapters/chapter4.tex}
+\input{chapters/chapter5.tex}
+\input{chapters/chapter6.tex}
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}

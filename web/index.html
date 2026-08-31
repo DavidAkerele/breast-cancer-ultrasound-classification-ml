@@ -3,91 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OncoVision AI | Breast Cancer Diagnostic Suite</title>
+    <title>OncoVision AI | MSc Dissertation Diagnostic Suite</title>
     
     <!-- Primary Meta Tags -->
-    <meta name="title" content="OncoVision AI | Breast Cancer Classification">
-    <meta name="description" content="An interactive deep learning diagnostic suite for breast cancer ultrasound classification. Built with PyTorch and FastAPI.">
+    <meta name="title" content="OncoVision AI | MSc Dissertation Breast Cancer Diagnostics">
+    <meta name="description" content="MSc Computer Science research suite for breast-ultrasound classification, ROI resizing, and acoustic-noise analysis.">
     
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="OncoVision AI | Breast Cancer Classification">
-    <meta property="og:description" content="Automated Breast Cancer Ultrasound Classification using Deep Convolutional Neural Networks and CLAHE contrast enhancement.">
-    <meta property="og:image" content="og-image.png">
-
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="apple-touch-icon" href="favicon.svg">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Cropper.js for ROI Cropping (Fixes missing library dependency) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <!-- KaTeX for Publication-Grade LaTeX Math Formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=9">
+    <!-- Marked.js for Rendering Thesis Documentation -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <link rel="stylesheet" href="style.css?v=16">
 </head>
-<body>
+<body class="dark-theme">
     <div class="app-container">
-        <!-- Thin Left Sidebar Navigation Dock -->
+        <!-- Expanded Sidebar Navigation Dock (210px) -->
         <aside class="sidebar-dock">
-            <div class="brand-logo-container">
-                <div class="brand-logo-badge">O<sup>+</sup></div>
+            <div class="brand-header">
+                <div class="brand-logo-badge" title="OncoVision AI MSc Suite">O<sup>+</sup></div>
+                <div class="brand-text">
+                    <span class="brand-name">OncoVision AI</span>
+                    <span class="brand-sub">MSc Dissertation</span>
+                </div>
             </div>
             
-            <nav class="nav-icons-container">
-                <button class="nav-icon-btn active" id="btnUiMode" title="UI Diagnostic View">
+            <nav class="nav-menu">
+                <button class="nav-item active" id="btnUiMode">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                        <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                        <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                        <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
                     </svg>
-                    <span class="nav-label">Dashboard</span>
+                    <span>Workstation</span>
                 </button>
                 
-                <button class="nav-icon-btn" id="btnNoiseMode" title="Noise Comparison Study">
+                <button class="nav-item" id="btnNoiseMode">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
                     </svg>
-                    <span class="nav-label">Compare</span>
+                    <span>Acoustic Noise Lab</span>
+                </button>
+
+                <button class="nav-item" id="btnDatasetMode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Dataset Explorer</span>
                 </button>
                 
-                <button class="nav-icon-btn" id="btnCodeMode" title="Notebook Code View">
+                <button class="nav-item" id="btnThesisMode">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                     </svg>
-                    <span class="nav-label">Notebook</span>
-                </button>
-                
-                <button class="nav-icon-btn" id="btnToggleAuditLog" title="Clinical Audit Log">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    <span class="nav-label">Audit Log</span>
+                    <span>Thesis Reader</span>
                 </button>
             </nav>
             
-            <div class="bottom-icons-container">
-                <button class="nav-icon-btn" id="btnToggleTheme" title="Toggle Theme">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sun-icon">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                </button>
+            <div class="sidebar-footer">
+                <div class="msc-tag">
+                    <span class="msc-label">MSc Project</span>
+                    <span class="author-name">David Akerele</span>
+                </div>
             </div>
         </aside>
 
@@ -96,588 +86,410 @@
             <!-- Header Bar -->
             <header class="app-header-bar">
                 <div class="header-left">
-                    <h1 class="header-title">OncoVision AI <span class="badge">Prototype</span></h1>
-                    <p class="header-subtitle">Breast Cancer Diagnostics Suite &bull; Convolutional Architecture Evaluation</p>
+                    <h1 class="header-title">OncoVision AI <span class="badge msc">MSc Dissertation</span></h1>
+                    <p class="header-subtitle">Automated Breast Ultrasound Classification &bull; Biophysical Noise & ROI Resizing Analysis</p>
                 </div>
                 
-                <div class="header-right">
-                    <div class="search-pill-container">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon-svg">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" placeholder="Search patient ID, scans..." class="search-input">
+                <div class="header-controls">
+                    <div class="control-group">
+                        <span class="control-label">Loaded research model</span>
+                        <span id="loadedModel" class="model-chip">Checking availability…</span>
                     </div>
-                    
-                    <div class="hardware-status-badge">
-                        <span class="lbl">Device:</span>
-                        <span class="val" id="deviceIndicator">CPU</span>
+                    <div class="control-group">
+                        <label for="selectModelBackbone" class="control-label">Architecture</label>
+                        <select id="selectModelBackbone" class="glass-select">
+                            <option value="resnet50">ResNet-50</option>
+                            <option value="efficientnet_b0">EfficientNet-B0</option>
+                            <option value="custom_cnn">Custom CNN</option>
+                        </select>
                     </div>
-                    
-                    <div class="avatar-container">
-                        <img src="https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=100&h=100" alt="Radiologist Profile" class="avatar-img">
+
+                    <!-- Cropping & Resizing Strategy Selector -->
+                    <div class="control-group">
+                        <label for="selectCropStrategy" class="control-label">Crop & Resizing Strategy</label>
+                        <select id="selectCropStrategy" class="glass-select highlight">
+                            <option value="roi_crop" selected>🎯 ROI Crop (Padded Square)</option>
+                            <option value="center_crop">🔳 Center Crop (PyTorch Default)</option>
+                            <option value="direct_resize">📐 Direct Resize (Anamorphic)</option>
+                        </select>
+                    </div>
+
+                    <!-- CLAHE Contrast Enhancement Toggle -->
+                    <div class="control-group toggle-group">
+                        <label for="chkUseClahe" class="control-label">CLAHE Enhancement</label>
+                        <label class="switch">
+                            <input type="checkbox" id="chkUseClahe" checked>
+                            <span class="slider round"></span>
+                        </label>
                     </div>
                 </div>
             </header>
 
-            <!-- Workspace Body Wrapper -->
-            <div class="workspace-body">
-                <!-- UI Dashboard Mode Container -->
-                <main class="dashboard-wrapper-grid" id="uiDashboardContainer">
-                    <!-- Left Section: Configs & Inputs -->
-                    <div class="workspace-col-left">
-                        <!-- Model Selection Metric Cards -->
-                        <section class="section-card">
-                            <h3 class="section-title-small">Select Model Backbone</h3>
-                            <div class="model-cards-grid" id="archSelectorList">
-                                <div class="model-metric-card arch-card active" data-value="custom_cnn">
-                                    <div class="model-card-header">
-                                        <div class="model-icon-circle blue">CNN</div>
-                                        <span class="model-acc-badge">88.7% Acc</span>
-                                    </div>
-                                    <h4 class="model-name">Custom CNN</h4>
-                                    <p class="model-type">4-Block Baseline Model</p>
-                                </div>
-                                
-                                <div class="model-metric-card arch-card" data-value="resnet50">
-                                    <div class="model-card-header">
-                                        <div class="model-icon-circle purple">RES</div>
-                                        <span class="model-acc-badge">94.2% Acc</span>
-                                    </div>
-                                    <h4 class="model-name">ResNet-50</h4>
-                                    <p class="model-type">Transfer Learning Backbone</p>
-                                </div>
-                                
-                                <div class="model-metric-card arch-card" data-value="efficientnet_b0">
-                                    <div class="model-card-header">
-                                        <div class="model-icon-circle green">EFF</div>
-                                        <span class="model-acc-badge">95.5% Acc</span>
-                                    </div>
-                                    <h4 class="model-name">EfficientNet-B0</h4>
-                                    <p class="model-type">Compound Scaled ConvNet</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Hidden select for script.js binding compatibility -->
-                            <select id="modelSelect" style="display: none;">
-                                <option value="resnet50">ResNet-50 Fine-tuned</option>
-                                <option value="efficientnet_b0">EfficientNet-B0 Backbone</option>
-                                <option value="custom_cnn" selected>Custom 4-Block CNN</option>
-                            </select>
-
-                            <!-- Selected Model Details Card -->
-                            <div class="explainer-detail-card" id="architectureExplainer">
-                                <div class="explainer-detail-header">
-                                    <span class="explainer-badge" id="explainerBadge">Convolutional Baseline</span>
-                                    <span class="explainer-params" id="explainerParams">1.2M Params</span>
-                                </div>
-                                <h4 class="explainer-name" id="explainerName">Custom 4-Block CNN</h4>
-                                <p class="explainer-desc" id="explainerDesc">A custom Convolutional Neural Network built specifically for this dataset. Composed of 4 successive Conv2D blocks with Batch Normalization and ReLU activations to learn localized low-level ultrasound texture patterns.</p>
-                                <div class="explainer-rationale">
-                                    <strong>Clinical Rationale:</strong>
-                                    <span id="explainerRationale">Acts as a clinical control baseline to evaluate the performance improvement of transfer learning models.</span>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Preprocessing & Case Handlers row -->
-                        <section class="section-card-row">
-                            <!-- Preprocessing switches -->
-                            <div class="settings-card">
-                                <div class="settings-header">
-                                    <div>
-                                        <h4 class="settings-title">CLAHE Enhancement</h4>
-                                        <p class="settings-subtitle">Contrast Equalization Engine</p>
-                                    </div>
-                                    <label class="switch-toggle">
-                                        <input type="checkbox" id="claheToggle" checked>
-                                        <span class="toggle-slider"></span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Case controls -->
-                            <div class="settings-card">
-                                <div class="sample-benchmark-row">
-                                    <h4 class="settings-title" style="margin-bottom: 0;">Benchmark cases:</h4>
-                                    <div class="sample-btn-group">
-                                        <button class="sample-btn benign-btn" data-type="benign">
-                                            <span class="dot green-dot"></span> Benign Study
-                                        </button>
-                                        <button class="sample-btn malignant-btn" data-type="malignant">
-                                            <span class="dot red-dot"></span> Malignant Study
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Input Controls Card -->
-                        <section class="section-card">
-                            <h3 class="section-title-small">Diagnostic Input</h3>
-                            
-                            <div class="diagnostic-input-grid">
-                                <div class="input-selection-pane">
-                                    <div class="form-group-pill">
-                                        <label class="form-label-pill">Select Dataset Source</label>
-                                        <div class="segmented-pill-control" id="datasetSplitTabs">
-                                            <button class="segment-btn active" data-value="val">Validation</button>
-                                            <button class="segment-btn" data-value="train">Training</button>
-                                            <button class="segment-btn" data-value="test">Testing</button>
-                                        </div>
-                                        <select id="datasetSplitSelect" style="display: none;">
-                                            <option value="val" selected>Validation Dataset</option>
-                                            <option value="train">Training Dataset</option>
-                                            <option value="test">Testing Dataset</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-group-pill" style="margin-top: 16px;">
-                                        <label for="existingStudySelect" class="form-label-pill">Select Patient Study</label>
-                                        <select id="existingStudySelect" class="select-pill-input">
-                                            <option value="" selected>-- Choose patient study --</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div class="input-upload-pane">
-                                    <div class="dropzone-card" id="dropzone">
-                                        <input type="file" id="fileInput" accept="image/png, image/jpeg, image/jpg, image/tiff" multiple hidden>
-                                        <div class="dropzone-content-wrapper" id="dropzoneContent">
-                                            <div class="upload-icon-circle">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                                </svg>
-                                            </div>
-                                            <h4>Drag & Drop Ultrasound Study</h4>
-                                            <p>Supports PNG or JPG ultrasound scans</p>
-                                            <button class="browse-btn" type="button" onclick="document.getElementById('fileInput').click()">Browse Files</button>
-                                        </div>
-                                        
-                                        <div class="dropzone-preview-wrapper hidden" id="dropzonePreview">
-                                            <img src="" id="dropzonePreviewImg" alt="Upload Preview" class="preview-thumb-img">
-                                            <div class="preview-meta-details">
-                                                <span id="previewFilename" class="filename-text">filename.png</span>
-                                                <span id="previewFilesize" class="filesize-text">0.00 MB</span>
-                                            </div>
-                                            <button type="button" class="btn-clear-preview" id="btnRemovePreview" title="Remove image">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button id="analyzeBtn" class="primary-execute-btn" disabled>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon-svg">
-                                    <circle cx="11" cy="11" r="8"></circle>
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <!-- CANVAS VIEW 1: DIAGNOSTIC WORKSTATION -->
+            <main id="viewWorkstation" class="view-panel active">
+                <div class="workstation-grid">
+                    <!-- Left Column: Image Viewports & Upload -->
+                    <section class="panel-card viewport-card">
+                        <div class="panel-header">
+                            <h3 class="panel-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <circle cx="12" cy="12" r="3"></circle>
                                 </svg>
-                                Execute Diagnosis
-                            </button>
-                        </section>
-
-                        <!-- Horizontal Scans Gallery -->
-                        <section class="section-card">
-                            <div class="gallery-header-row">
-                                <h3 class="section-title-small" style="margin-bottom: 0;">Patient Scan Directory</h3>
-                                <span class="gallery-count-badge" id="galleryCount">0 scans</span>
+                                Image Acquisition & Spotlight Lens
+                            </h3>
+                            <div class="header-action-btns">
+                                <span class="gt-tag-badge unknown hidden" id="gtTagBadge">Ground Truth: --</span>
+                                <button class="btn-secondary hidden" id="btnChangeImage">Change Scan</button>
+                                <span class="status-indicator live" id="systemStatus" role="status" aria-live="polite" data-state="ready">Ready</span>
                             </div>
-                            <div class="horizontal-scans-carousel" id="galleryGrid">
-                                <div class="gallery-empty-state">
-                                    <p>Loading database scans...</p>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
+                        </div>
 
-                    <!-- Right Section: Medical Visualizer & Output Badges -->
-                    <div class="workspace-col-right">
-                        <!-- Diagnostic Visualizer Panel -->
-                        <div class="visualizer-card">
-                            <!-- Visualizer Empty State -->
-                            <div id="emptyState" class="visualizer-empty-panel">
-                                <div class="empty-icon-circle">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                        <polyline points="14 2 14 8 20 8"></polyline>
-                                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <!-- Drop Zone / Upload Area -->
+                        <div class="upload-dropzone" id="dropzone">
+                            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.tif,.tiff,image/png,image/jpeg,image/tiff" class="file-input-hidden">
+                            <div class="dropzone-content">
+                                <div class="upload-icon-wrapper">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
                                     </svg>
                                 </div>
-                                <h3>Awaiting Ultrasound scan</h3>
-                                <p>Load a patient study or drop files to execute CNN inference.</p>
-                            </div>
-
-                            <!-- Loading State -->
-                            <div id="loadingState" class="visualizer-loading-panel hidden">
-                                <div class="scanner-ring-container">
-                                    <div class="scanner-beam-line"></div>
-                                </div>
-                                <h3>Extracting Feature Map...</h3>
-                                <p>Running forward propagation, CLAHE filtering, and boundary estimation</p>
-                            </div>
-
-                            <!-- Diagnostic Outputs (Loaded state) -->
-                            <div id="resultsContent" class="visualizer-results-panel hidden">
-                                <div class="visualizer-display-frame">
-                                    <div class="scan-image-wrapper">
-                                        <span class="scan-badge original-badge">Original Scan</span>
-                                        <img id="origImgPreview" src="" alt="Original Ultrasound">
-                                    </div>
-                                    
-                                    <div class="scan-image-wrapper">
-                                        <span class="scan-badge enhanced-badge">CLAHE Enhanced</span>
-                                        <img id="claheImgPreview" src="" alt="Enhanced Ultrasound" class="hidden">
-                                        <div id="clahePlaceholder" class="enhanced-placeholder-card">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-                                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                            </svg>
-                                            <p>Awaiting CLAHE execution</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Floating UI AI Outcome Card -->
-                                <div class="verdict-floating-card pending" id="verdictBanner">
-                                    <div class="verdict-info">
-                                        <span class="verdict-subtitle">AI Classifier Outcome</span>
-                                        <h3 class="verdict-title-text" id="verdictTitle">Pending execution</h3>
-                                    </div>
-                                    <div class="verdict-confidence-badge" id="verdictConfidence">Awaiting</div>
-                                </div>
-
-                                <!-- Probability Bars -->
-                                <div class="probability-card">
-                                    <div class="prob-progress-row">
-                                        <div class="prob-labels">
-                                            <span>Benign Class Probability</span>
-                                            <strong id="benignProbVal">0%</strong>
-                                        </div>
-                                        <div class="prob-track">
-                                            <div class="prob-fill benign-color-fill" id="benignProbBar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="prob-progress-row" style="margin-top: 12px;">
-                                        <div class="prob-labels">
-                                            <span>Malignant Class Probability</span>
-                                            <strong id="malignantProbVal">0%</strong>
-                                        </div>
-                                        <div class="prob-track">
-                                            <div class="prob-fill malignant-color-fill" id="malignantProbBar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Clinical Insights Report -->
-                                <div class="clinical-report-card" id="clinicalDetailsPanel">
-                                    <h4 class="clinical-title">Clinical Diagnostics Report</h4>
-                                    <div class="clinical-metrics-table">
-                                        <div class="clinical-table-cell">
-                                            <span class="table-lbl">BI-RADS Classification</span>
-                                            <strong class="table-val highlight" id="clinicalBirads">Awaiting execution...</strong>
-                                        </div>
-                                        <div class="clinical-table-cell">
-                                            <span class="table-lbl">Estimated Tissue Density</span>
-                                            <strong class="table-val" id="clinicalDensity">Awaiting execution...</strong>
-                                        </div>
-                                        <div class="clinical-table-cell full-width">
-                                            <span class="table-lbl">Acoustic Shadowing Profile</span>
-                                            <p class="table-desc" id="clinicalShadowing">Awaiting execution...</p>
-                                        </div>
-                                    </div>
-                                    <div class="clinical-summary-footer" id="clinicalSummaryBox">
-                                        <strong>Diagnostic Rationale:</strong>
-                                        <p id="clinicalSummaryText">Awaiting feature evaluation...</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Batch Results Panel -->
-                            <div id="batchResultsContent" class="visualizer-batch-panel hidden">
-                                <div class="batch-metrics-summary">
-                                    <div class="batch-metric-box">
-                                        <span class="lbl">Total Scans</span>
-                                        <h3 id="batchTotalCount">0</h3>
-                                    </div>
-                                    <div class="batch-metric-box text-green">
-                                        <span class="lbl">Benign Predicted</span>
-                                        <h3 id="batchBenignCount">0</h3>
-                                    </div>
-                                    <div class="batch-metric-box text-red">
-                                        <span class="lbl">Malignant Predicted</span>
-                                        <h3 id="batchMalignantCount">0</h3>
-                                    </div>
-                                </div>
-
-                                <div class="batch-table-container">
-                                    <table class="batch-scans-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Scan Filename</th>
-                                                <th>Verdict</th>
-                                                <th>Confidence</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="batchResultsTableBody">
-                                            <!-- Dynamically populated -->
-                                        </tbody>
-                                    </table>
+                                <h4 class="upload-title">Click or Drop Ultrasound Study Here</h4>
+                                <p class="upload-desc">PNG, JPG, and TIFF only &bull; maximum file size: 20 MB</p>
+                                <div class="button-row">
+                                    <button class="btn-primary" id="btnBrowse">Browse File</button>
+                                    <button class="btn-sample" id="btnLoadSample">⚡ Load Sample Scan</button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Integrated Noise Analysis Panel (Shifted from old third column) -->
-                        <div class="integrated-noise-card">
-                            <h4 class="integrated-noise-title">Mathematical Noise Estimation</h4>
-                            
-                            <div id="noiseContentEmpty" class="noise-empty-text">
-                                <p>Execute diagnostic inference to display noise levels.</p>
-                            </div>
-                            
-                            <div id="noiseContentResults" class="noise-results-wrapper hidden">
-                                <div class="noise-type-banner" id="noiseVerdictBanner">
-                                    <span class="banner-lbl">Dominant Noise Model</span>
-                                    <h4 id="dominantNoiseType" class="banner-title">Speckle Noise (Acoustic)</h4>
-                                    <p id="dominantNoiseDesc" class="banner-desc"></p>
+                        <!-- Dual Image Display Area -->
+                        <div class="viewport-dual-grid hidden" id="viewportArea">
+                            <div class="view-box">
+                                <div class="box-label">Raw Ultrasound Study</div>
+                                <div class="img-container">
+                                    <div class="img-placeholder" id="phOriginal">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                        <span>No Scan Loaded</span>
+                                    </div>
+                                    <img id="imgOriginal" src="" alt="" class="hidden">
                                 </div>
-                                
-                                <div class="noise-sliders-list">
-                                    <div class="noise-slider-item">
-                                        <div class="slider-labels">
-                                            <span>Acoustic Speckle Level</span>
-                                            <span id="speckleLevelVal">0%</span>
-                                        </div>
-                                        <div class="slider-track-bg">
-                                            <div class="slider-fill blue" id="speckleLevelBar" style="width: 0%"></div>
-                                        </div>
+                            </div>
+                            <div class="view-box highlight">
+                                <div class="box-label">Spotlight & 2.5X Zoom Lens View</div>
+                                <div class="img-container">
+                                    <div class="img-placeholder" id="phSpotlight">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                                        <span>Awaiting Inference</span>
                                     </div>
-                                    
-                                    <div class="noise-slider-item">
-                                        <div class="slider-labels">
-                                            <span>Thermal (Gaussian) Noise</span>
-                                            <span id="gaussianLevelVal">0%</span>
-                                        </div>
-                                        <div class="slider-track-bg">
-                                            <div class="slider-fill orange" id="gaussianLevelBar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="noise-slider-item">
-                                        <div class="slider-labels">
-                                            <span>Impulse (Salt & Pepper)</span>
-                                            <span id="impulseLevelVal">0%</span>
-                                        </div>
-                                        <div class="slider-track-bg">
-                                            <div class="slider-fill red" id="impulseLevelBar" style="width: 0%"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="snr-display-row">
-                                        <span>Signal-to-Noise Ratio (SNR):</span>
-                                        <strong id="snrValue">0.00 dB</strong>
-                                    </div>
+                                    <img id="imgSpotlight" src="" alt="" class="hidden">
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </main>
+                    </section>
 
-                <!-- Notebook Code Viewer Mode Container -->
-                <main class="notebook-wrapper-grid hidden" id="notebookContainer">
-                    <div class="notebook-inner-layout">
-                        <!-- Files Navigator -->
-                        <aside class="notebook-navigator-sidebar">
-                            <h4 class="nav-sidebar-title">Project Structure</h4>
-                            <nav class="notebook-file-links">
-                                <button class="file-nav-btn nav-item active" data-file="dataset.py">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                                    dataset.py
-                                </button>
-                                <button class="file-nav-btn nav-item" data-file="models.py">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                                    models.py
-                                </button>
-                                <button class="file-nav-btn nav-item" data-file="train.py">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                    train.py
-                                </button>
-                                <button class="file-nav-btn nav-item" data-file="evaluate.py">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                                    evaluate.py
-                                </button>
-                                <button class="file-nav-btn nav-item" data-file="config.py">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                                    config.py
-                                </button>
-                                <button class="file-nav-btn nav-item" data-file="predict.py">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                    predict.py
-                                </button>
-                            </nav>
-                        </aside>
-                        
-                        <!-- Notebook Content Panel -->
-                        <div class="notebook-cells-wrapper">
-                            <div class="notebook-sheet-header">
-                                <span class="active-file-badge" id="activeFileName">dataset.py</span>
-                                <div class="notebook-controls-row">
-                                    <button class="notebook-btn run-btn" id="btnRunAllCells">
-                                        <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                        Run All Cells
-                                    </button>
-                                    <button class="notebook-btn copy-btn" id="btnCopyCode">Copy Source</button>
+                    <!-- Right Column: Diagnostic Verdict & Reports -->
+                    <section class="panel-card analytics-card">
+                        <div class="panel-header">
+                            <h3 class="panel-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                </svg>
+                                Research classification result
+                            </h3>
+                        </div>
+
+                        <!-- Main Verdict Badge Card -->
+                        <div class="verdict-banner neutral" id="verdictBanner">
+                            <div class="verdict-main">
+                                <span class="verdict-caption">EXPERIMENTAL CLASSIFICATION</span>
+                                <h2 class="verdict-class" id="txtVerdict">AWAITING SCAN</h2>
+                            </div>
+                            <div class="verdict-confidence">
+                                <span class="confidence-val" id="txtConfidence">--%</span>
+                                <span class="confidence-lbl">Model confidence</span>
+                            </div>
+                        </div>
+
+                        <!-- Class Activation Probability Bars -->
+                        <div class="prob-section">
+                            <h4 class="sub-heading">Class Activation Distribution</h4>
+                            <div class="prob-bar-group">
+                                <div class="prob-label-row">
+                                    <span>Benign / Normal</span>
+                                    <span id="txtBenignProb">0.0%</span>
+                                </div>
+                                <div class="bar-track"><div class="bar-fill benign" id="barBenign" style="width: 0%"></div></div>
+                            </div>
+
+                            <div class="prob-bar-group">
+                                <div class="prob-label-row">
+                                    <span>Malignant</span>
+                                    <span id="txtMalignantProb">0.0%</span>
+                                </div>
+                                <div class="bar-track"><div class="bar-fill malignant" id="barMalignant" style="width: 0%"></div></div>
+                            </div>
+                        </div>
+
+                        <div class="report-section">
+                            <h4 class="sub-heading">Research context</h4>
+                            <div class="report-box" id="reportBox">
+                                <div class="report-item">
+                                    <span class="lbl">Loaded model:</span>
+                                    <span class="val highlight" id="txtModelName">--</span>
+                                </div>
+                                <div class="report-item">
+                                    <span class="lbl">Input noise profile:</span>
+                                    <span class="val" id="txtAcousticShadow">--</span>
+                                </div>
+                                <div class="report-rationale" id="txtRationale">
+                                    Experimental research output only. This interface does not provide diagnosis, BI-RADS assessment, risk estimates, or clinical advice.
                                 </div>
                             </div>
-                            
-                            <div class="notebook-cells-list-view" id="notebookCellsList">
-                                <!-- Cells generated dynamically -->
-                            </div>
                         </div>
-                    </div>
-                </main>
+                        <p class="research-notice" role="note">For academic demonstration only. Outputs are not for clinical use or patient care.</p>
+                    </section>
+                </div>
+            </main>
 
-                <!-- Noise Comparison Mode Container -->
-                <main class="noise-compare-wrapper hidden" id="noiseCompareContainer">
-                    <div class="noise-compare-header">
-                        <div class="noise-compare-title">
-                            <h2>Noise Diagnostic Comparison Study</h2>
-                            <p>Evaluate the resilience of convolutional neural networks against synthetic acoustic and thermal sensor noise.</p>
-                        </div>
-                        
-                        <div class="noise-compare-inputs">
-                            <div class="compare-input-group">
-                                <label>Select Target Scan</label>
-                                <select id="noiseStudySelect" class="select-pill-input dark">
-                                    <option value="" selected>-- Choose patient study --</option>
-                                </select>
-                            </div>
-                            <div class="compare-input-group">
-                                <label>Noise Type</label>
-                                <select id="noiseCompareType" class="select-pill-input dark">
-                                    <option value="speckle">Multiplicative Speckle</option>
-                                    <option value="gaussian">Thermal Gaussian</option>
-                                    <option value="impulse">Salt & Pepper Dropout</option>
-                                </select>
-                            </div>
-                            <div class="compare-input-group">
-                                <label>Noise Severity</label>
-                                <select id="noiseCompareSeverity" class="select-pill-input dark">
-                                    <option value="0.08">Mild Severity (Low)</option>
-                                    <option value="0.20" selected>Moderate Severity (Med)</option>
-                                    <option value="0.40">Severe Corruption (High)</option>
-                                </select>
-                            </div>
-                            <button class="primary-execute-btn width-auto" id="btnRunNoiseCompare">Run Comparison</button>
-                        </div>
+            <!-- CANVAS VIEW 2: ACOUSTIC NOISE LABORATORY (UNIFORM 4-COLUMN SUITE) -->
+            <main id="viewNoiseLab" class="view-panel">
+                <div class="noise-lab-container">
+                    <div class="noise-lab-header">
+                        <h3 class="panel-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                            </svg>
+                            Acoustic Noise & Resizing Solution Analysis Matrix
+                        </h3>
+                        <button class="btn-primary" id="btnSimulateNoise">⚡ Execute 4-Stage Comparative Analysis</button>
                     </div>
 
-                    <div class="noise-compare-split-grid">
-                        <!-- Clean Scan Frame -->
-                        <div class="compare-scan-card">
-                            <h3>1. Clean Reference Scan</h3>
-                            <div class="compare-display-frame">
-                                <img id="noiseCleanImg" src="" alt="Clean Reference" style="display: none;">
-                                <div id="noiseCleanPlaceholder" class="compare-placeholder-text">Load or select a patient study in the main tab first</div>
-                            </div>
-                            
-                            <div class="verdict-floating-card pending" id="noiseCleanBanner">
-                                <div class="verdict-info">
-                                    <span class="verdict-subtitle">Diagnostic Verdict</span>
-                                    <h4 id="noiseCleanVerdict" class="verdict-title-text">Awaiting Input...</h4>
+                    <!-- 4 Interactive Columns Grid (Uniform Full Height Spanning) -->
+                    <div class="noise-4col-grid">
+                        <!-- COLUMN 1: DATASET & SCAN ACQUISITION -->
+                        <div class="panel-card col-card">
+                            <div class="col-top">
+                                <div class="col-header">
+                                    <span class="col-num">COL 1</span>
+                                    <h4 class="col-title">Dataset & Acquisition</h4>
                                 </div>
-                                <div class="verdict-confidence-badge" id="noiseCleanConfidence">--</div>
+                                <div class="control-group mt-2">
+                                    <label class="control-label">Select Dataset</label>
+                                    <select id="selectNoiseDataset" class="glass-select">
+                                        <option value="busi" selected>BUSI Dataset</option>
+                                        <option value="oasbud">OASBUD Dataset</option>
+                                        <option value="breast">BrEaST Dataset</option>
+                                    </select>
+                                </div>
+                                <div class="control-group mt-2">
+                                    <button class="btn-sample full-width" id="btnNoiseLoadSample">⚡ Load Sample Scan</button>
+                                </div>
+                                <div class="view-box mt-3">
+                                    <div class="box-label">Raw Clean Scan</div>
+                                    <div class="img-container">
+                                        <div class="img-placeholder" id="phCol1">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                            <span>No Scan Loaded</span>
+                                        </div>
+                                        <img id="imgCol1Clean" src="" alt="" class="hidden">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="verdict-mini-card neutral mt-2" id="cardCol1Verdict">
+                                <span class="v-label">Stage 1: Clean classification</span>
+                                <span class="v-pred" id="txtCol1Pred">AWAITING SCAN</span>
+                                <span class="v-conf" id="txtCol1Conf">--%</span>
                             </div>
                         </div>
 
-                        <!-- Corrupted Scan Frame -->
-                        <div class="compare-scan-card">
-                            <h3>2. Synthetically Corrupted Scan</h3>
-                            <div class="compare-display-frame">
-                                <img id="noiseCorruptedImg" src="" alt="Corrupted Scan" style="display: none;">
-                                <div id="noiseCorruptedPlaceholder" class="compare-placeholder-text">Awaiting comparison execution...</div>
-                            </div>
-                            
-                            <div class="verdict-floating-card pending" id="noiseCorruptedBanner">
-                                <div class="verdict-info">
-                                    <span class="verdict-subtitle">Diagnostic Verdict</span>
-                                    <h4 id="noiseCorruptedVerdict" class="verdict-title-text">Awaiting Input...</h4>
+                        <!-- COLUMN 2: SYNTHETIC NOISE GENERATOR -->
+                        <div class="panel-card col-card">
+                            <div class="col-top">
+                                <div class="col-header">
+                                    <span class="col-num">COL 2</span>
+                                    <h4 class="col-title">Synthetic Noise Generator</h4>
                                 </div>
-                                <div class="verdict-confidence-badge" id="noiseCorruptedConfidence">--</div>
+                                <div class="control-group mt-2">
+                                    <label class="control-label">Noise Profile Type</label>
+                                    <select id="selectNoiseType" class="glass-select">
+                                        <option value="speckle" selected>Speckle (Acoustic Scatter)</option>
+                                        <option value="gaussian">Gaussian (Sensor Noise)</option>
+                                        <option value="impulse">Impulse (Salt & Pepper)</option>
+                                    </select>
+                                </div>
+                                <div class="control-group mt-2">
+                                    <div class="slider-header">
+                                        <label class="control-label">Intensity ($\sigma$)</label>
+                                        <span id="lblIntensityVal" class="slider-val">0.05</span>
+                                    </div>
+                                    <input type="range" id="rangeIntensity" min="0.01" max="0.15" step="0.01" value="0.05" class="glass-range">
+                                </div>
+                                <div class="view-box alert mt-3">
+                                    <div class="box-label">Noisy Uncropped Scan</div>
+                                    <div class="img-container">
+                                        <div class="img-placeholder" id="phCol2">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                                            <span>No Noise Active</span>
+                                        </div>
+                                        <img id="imgCol2Noisy" src="" alt="" class="hidden">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="verdict-mini-card neutral mt-2" id="cardCol2Verdict">
+                                <span class="v-label">Stage 2: Noisy classification</span>
+                                <span class="v-pred" id="txtCol2Pred">AWAITING SCAN</span>
+                                <span class="v-conf" id="txtCol2Conf">--%</span>
+                            </div>
+                        </div>
+
+                        <!-- COLUMN 3: RESIZING SOLUTION A (INTERACTIVE STRATEGY SELECTOR) -->
+                        <div class="panel-card col-card">
+                            <div class="col-top">
+                                <div class="col-header">
+                                    <span class="col-num">COL 3</span>
+                                    <h4 class="col-title">Resizing Solution A</h4>
+                                </div>
+                                <div class="control-group mt-2">
+                                    <label for="selectCol3Strategy" class="control-label">Resizing Methodology</label>
+                                    <select id="selectCol3Strategy" class="glass-select">
+                                        <option value="direct_resize" selected>📐 Direct Resize (Anamorphic)</option>
+                                        <option value="center_crop">🔳 Center Crop (PyTorch Default)</option>
+                                        <option value="roi_crop">🎯 ROI Crop (Padded Square)</option>
+                                    </select>
+                                </div>
+                                <div class="view-box mt-3">
+                                    <div class="box-label" id="lblCol3Box">Solution A Processed Tensor</div>
+                                    <div class="img-container">
+                                        <div class="img-placeholder" id="phCol3">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                                            <span>No Tensor Processed</span>
+                                        </div>
+                                        <img id="imgCol3Direct" src="" alt="" class="hidden">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="verdict-mini-card neutral mt-2" id="cardCol3Verdict">
+                                <span class="v-label">Stage 3: Method A classification</span>
+                                <span class="v-pred" id="txtCol3Pred">AWAITING SCAN</span>
+                                <span class="v-conf" id="txtCol3Conf">--%</span>
+                            </div>
+                        </div>
+
+                        <!-- COLUMN 4: RESIZING SOLUTION B (INTERACTIVE STRATEGY SELECTOR) -->
+                        <div class="panel-card col-card highlight">
+                            <div class="col-top">
+                                <div class="col-header">
+                                    <span class="col-num highlight">COL 4</span>
+                                    <h4 class="col-title">Proposed Solution B</h4>
+                                </div>
+                                <div class="control-group mt-2">
+                                    <span class="control-label">Fixed proposed methodology</span>
+                                    <span class="model-chip">ROI crop + reflection padding</span>
+                                </div>
+                                <div class="view-box highlight mt-3">
+                                    <div class="box-label" id="lblCol4Box">Proposed Solution B Tensor</div>
+                                    <div class="img-container">
+                                        <div class="img-placeholder" id="phCol4">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8m-4-4h8"/></svg>
+                                            <span>No Solution Active</span>
+                                        </div>
+                                        <img id="imgCol4Roi" src="" alt="" class="hidden">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="verdict-mini-card neutral mt-2" id="cardCol4Verdict">
+                                <span class="v-label">Stage 4: Method B classification</span>
+                                <span class="v-pred" id="txtCol4Pred">AWAITING SCAN</span>
+                                <span class="v-conf" id="txtCol4Conf">--%</span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="compare-explanation-card">
-                        <h4>Biophysical Explanation & Clinical Impact</h4>
-                        <p id="noiseExplanationText">Select an image scan, choose the target noise simulation configuration, and click 'Run Comparison'. The dashboard will compare the network's predictive stability under noise and explain how the signal disruption affects convolutional feature layers.</p>
+                    <!-- Comparative Explanation Footer -->
+                    <div class="explanation-box mt-3" id="txtNoiseExplanation">
+                        Controlled experiment: the same seeded noise realization is used in columns 2–4. Percentages are the selected model’s observed softmax confidence, not adjusted scores.
                     </div>
-                </main>
-            </div>
-            
-            <!-- App Footer (Compact) -->
-            <footer class="app-footer-bar-compact">
-                <p>OncoVision AI Diagnostic Suite &bull; Dissertation Research Prototype</p>
-            </footer>
+                </div>
+            </main>
+
+            <!-- CANVAS VIEW 3: DATASET EXPLORER -->
+            <main id="viewDataset" class="view-panel">
+                <div class="panel-card full-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">Validation Dataset Partition Explorer</h3>
+                        <div class="dataset-selectors">
+                            <select id="selectDataset" class="glass-select">
+                                <option value="busi" selected>BUSI Dataset (Breast Ultrasound Image)</option>
+                                <option value="oasbud">OASBUD Dataset</option>
+                                <option value="breast">BrEaST Dataset</option>
+                            </select>
+                            <select id="selectSplit" class="glass-select">
+                                <option value="val" selected>Validation Partition</option>
+                                <option value="test">Test Partition</option>
+                                <option value="train">Train Partition</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="dataset-grid" id="datasetGrid">
+                        <!-- Dynamic Dataset File Cards -->
+                    </div>
+                </div>
+            </main>
+
+            <!-- CANVAS VIEW 4: THESIS & RESEARCH READER -->
+            <main id="viewThesis" class="view-panel">
+                <div class="thesis-layout">
+                    <div class="panel-card thesis-sidebar-card">
+                        <h3 class="panel-title">MSc Dissertation Documents</h3>
+                        <ul class="doc-list" id="docList">
+                            <li class="doc-item active" data-file="IMAGE_RESIZING_AND_CROPPING_NOISE_ANALYSIS.md">🔬 Resizing, Cropping & Noise Analysis</li>
+                            <li class="doc-item" data-file="DISSERTATION.md">📄 Master Dissertation Thesis</li>
+                            <li class="doc-item" data-file="USER_MANUAL.md">📖 User & System Operating Manual</li>
+                            <li class="doc-item" data-file="Chapter_1_Introduction.md">1️⃣ Chapter 1: Introduction</li>
+                            <li class="doc-item" data-file="Chapter_2_Literature_Review.md">2️⃣ Chapter 2: Literature Review</li>
+                            <li class="doc-item" data-file="Chapter_3_Methodology.md">3️⃣ Chapter 3: Methodology</li>
+                            <li class="doc-item" data-file="Chapter_4_Implementation_And_Training.md">4️⃣ Chapter 4: Implementation</li>
+                            <li class="doc-item" data-file="Chapter_5_Results_And_Evaluation.md">5️⃣ Chapter 5: Results & Evaluation</li>
+                            <li class="doc-item" data-file="Chapter_6_Discussion_And_Conclusion.md">6️⃣ Chapter 6: Conclusion</li>
+                        </ul>
+                    </div>
+
+                    <div class="panel-card thesis-content-card">
+                        <div class="markdown-body" id="markdownViewer">
+                            <p class="placeholder-text">Loading thesis documentation...</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
 
-    <!-- Slide-over Clinical Audit Log Drawer -->
-    <div class="audit-log-drawer" id="auditLogDrawer">
-        <div class="drawer-header">
-            <h3>Clinical Audit Log</h3>
-            <button class="btn-clear-logs" id="btnClearLogs">Clear Log</button>
-            <button class="drawer-close-btn" id="btnHideAuditLog" title="Close Drawer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        </div>
-        <div class="log-console-container" id="logConsole">
-            <!-- Appended dynamically -->
-        </div>
-    </div>
-
-    <!-- ROI Image Cropping Modal (Fixes missing element dependencies) -->
-    <div class="crop-modal-overlay" id="cropModalOverlay">
-        <div class="crop-modal-card">
-            <div class="crop-modal-header">
-                <h3>Select Region of Interest (ROI)</h3>
-                <p>Crop the ultrasound scan to isolate the suspicious nodule for optimal CNN classification.</p>
-            </div>
-            <div class="crop-editor-workspace">
-                <img id="cropModalImg" src="" alt="Ultrasound Target">
-            </div>
-            <div class="crop-modal-footer">
-                <button class="browse-btn secondary" id="cropModalCancel">Cancel</button>
-                <button class="primary-execute-btn width-auto" id="cropModalConfirm">Analyze Selected ROI</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Alert Modal Dialog Overlay -->
-    <div class="alert-modal-overlay" id="alertModalOverlay">
-        <div class="alert-modal" id="alertModal">
-            <div class="alert-modal-icon" id="alertModalIcon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+    <!-- NON-BREAST ULTRASOUND REJECTION MODAL -->
+    <div id="modalRejection" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalRejectionTitle">
+        <div class="modal-card">
+            <button id="btnModalClose" class="modal-close-btn" aria-label="Close alert">&times;</button>
+            <div class="modal-icon-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="modal-warning-icon">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
                 </svg>
             </div>
-            <h3 id="alertModalTitle">Alert</h3>
-            <p id="alertModalMessage">An error occurred.</p>
-            <button class="primary-execute-btn alert-modal-dismiss" id="alertModalDismiss">Dismiss</button>
+            <h3 id="modalRejectionTitle" class="modal-title">Invalid Image Upload Detected</h3>
+            <div class="modal-body-box">
+                <p id="modalRejectionMessage" class="modal-message-text">
+                    NON_BREAST_ULTRASOUND: Please put in an actual breast cancer scan. The uploaded file is a natural color photo rather than a B-mode breast ultrasound study.
+                </p>
+            </div>
+            <div class="modal-action-row">
+                <button id="btnModalDismiss" class="btn-primary modal-action-btn">📂 Upload Valid Breast Ultrasound Scan</button>
+            </div>
         </div>
     </div>
 
-    <script src="script.js?v=10"></script>
+    <script src="script.js?v=17"></script>
 </body>
 </html>

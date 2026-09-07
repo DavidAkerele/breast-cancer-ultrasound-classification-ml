@@ -1,10 +1,15 @@
 import os
 import argparse
+import csv
+import hashlib
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score, roc_curve, auc
 from tqdm import tqdm
 
 try:
@@ -15,6 +20,8 @@ except ImportError:
     import config
     from dataset import get_dataloaders
     from models import get_model
+
+from scripts.audit_data import build_report
 
 @torch.no_grad()
 def evaluate():
@@ -61,6 +68,14 @@ def evaluate():
 
     all_labels = np.array(all_labels)
     all_preds = np.array(all_preds)
+    all_probs = np.array(all_probs)
+
+    summary = {
+        "accuracy": round(float(accuracy_score(all_labels, all_preds)), 4),
+        "macro_f1": round(float(f1_score(all_labels, all_preds, average="macro", zero_division=0)), 4),
+        "macro_precision": round(float(precision_score(all_labels, all_preds, average="macro", zero_division=0)), 4),
+        "macro_recall": round(float(recall_score(all_labels, all_preds, average="macro", zero_division=0)), 4),
+    }
 
     # Print Classification Report
     print("\n--- Classification Report ---")
@@ -83,6 +98,7 @@ def evaluate():
     if config.NUM_CLASSES == 2 and len(all_probs) > 0:
         fpr, tpr, _ = roc_curve(all_labels, all_probs)
         roc_auc = auc(fpr, tpr)
+        summary["roc_auc"] = round(float(roc_auc), 4)
         print(f"ROC AUC Score: {roc_auc:.4f}")
 
         plt.figure(figsize=(6, 5))
@@ -99,6 +115,49 @@ def evaluate():
         plt.savefig(roc_path, dpi=300)
         plt.close()
         print(f"Saved ROC Curve to: {roc_path}")
+
+    audit_report = build_report(Path(config.DATA_DIR))
+    audit_text = json.dumps(audit_report, indent=2, sort_keys=True) + "\n"
+    audit_path = os.path.join(config.OUTPUT_DIR, "data_audit.json")
+    with open(audit_path, "w", encoding="utf-8") as f:
+        f.write(audit_text)
+
+    predictions_path = os.path.join(config.OUTPUT_DIR, "predictions.csv")
+    sample_paths = [sample[0] for sample in eval_loader.dataset.samples]
+    with open(predictions_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["sample", "true_label", "predicted_label", "malignant_probability"])
+        for path, true_idx, pred_idx, probability in zip(sample_paths, all_labels, all_preds, all_probs):
+            writer.writerow([
+                os.path.relpath(path, config.BASE_DIR),
+                config.CLASS_NAMES[int(true_idx)],
+                config.CLASS_NAMES[int(pred_idx)],
+                f"{float(probability):.8f}",
+            ])
+
+    metrics_path = os.path.join(config.OUTPUT_DIR, "metrics.json")
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "model_name": model_name,
+            "checkpoint": os.path.relpath(args.checkpoint, config.BASE_DIR),
+            "split": args.split,
+            "samples": int(len(all_labels)),
+            "class_names": config.CLASS_NAMES,
+            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "data_audit_passed": audit_report["audit_passed"],
+            "evidence_status": "validated" if audit_report["audit_passed"] else "provisional",
+            "data_audit_sha256": hashlib.sha256(audit_text.encode("utf-8")).hexdigest(),
+            "preprocessing": {
+                "use_clahe": config.USE_CLAHE,
+                "crop_strategy": config.CROP_STRATEGY,
+                "image_size": config.IMG_SIZE,
+            },
+            "summary": summary,
+            "confusion_matrix": cm.tolist(),
+            "predictions_file": os.path.relpath(predictions_path, config.BASE_DIR),
+        }, f, indent=2)
+    print(f"Saved machine-readable metrics to: {metrics_path}")
+    print(f"Saved per-sample predictions to: {predictions_path}")
 
 if __name__ == "__main__":
     evaluate()

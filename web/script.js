@@ -1,616 +1,532 @@
-/* ==========================================================================
-   OncoVision AI | MSc Dissertation Clinical UI Controller
-   ========================================================================== */
+/* OncoVision Research — dependency-light interface controller. */
+document.addEventListener("DOMContentLoaded", () => {
+    const byId = (id) => document.getElementById(id);
+    const views = [...document.querySelectorAll(".view")];
+    const navButtons = [...document.querySelectorAll("[data-view]")];
+    const modelSelect = byId("modelSelect");
+    const cropSelect = byId("cropSelect");
+    const claheToggle = byId("claheToggle");
+    const sidebar = byId("sidebar");
+    const menuButton = byId("menuButton");
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Navigation Elements
-    const btnUiMode = document.getElementById('btnUiMode');
-    const btnNoiseMode = document.getElementById('btnNoiseMode');
-    const btnDatasetMode = document.getElementById('btnDatasetMode');
-    const btnThesisMode = document.getElementById('btnThesisMode');
+    const viewCopy = {
+        workstation: ["Single-image inspection", "Trace one image through preprocessing, classification, and visual explanation."],
+        noise: ["Noise experiment", "Compare a seeded synthetic perturbation across documented preprocessing paths."],
+        batch: ["Batch evaluation", "Review multiple model outputs without assigning clinical priority."],
+        evidence: ["Evidence record", "Read generated metrics together with the subject-level split audit."],
+        dataset: ["Dataset explorer", "Inspect local image folders and their current labels."],
+        documentation: ["Documentation", "Read the submission-facing project record directly from source."],
+    };
 
-    const viewWorkstation = document.getElementById('viewWorkstation');
-    const viewNoiseLab = document.getElementById('viewNoiseLab');
-    const viewDataset = document.getElementById('viewDataset');
-    const viewThesis = document.getElementById('viewThesis');
+    const state = {
+        currentFile: null,
+        currentGroundTruth: null,
+        inference: null,
+        imageObjectUrl: null,
+        noiseFile: null,
+        batchResults: [],
+        batchLabels: new Map(),
+        evidenceLoaded: false,
+    };
 
-    // Controls
-    const loadedModel = document.getElementById('loadedModel');
-    const selectModelBackbone = document.getElementById('selectModelBackbone');
-    const selectCropStrategy = document.getElementById('selectCropStrategy');
-    const chkUseClahe = document.getElementById('chkUseClahe');
-
-    // Upload & Workstation Viewport
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('fileInput');
-    const btnBrowse = document.getElementById('btnBrowse');
-    const btnLoadSample = document.getElementById('btnLoadSample');
-    const btnChangeImage = document.getElementById('btnChangeImage');
-    const viewportArea = document.getElementById('viewportArea');
-    const imgOriginal = document.getElementById('imgOriginal');
-    const imgSpotlight = document.getElementById('imgSpotlight');
-    const systemStatus = document.getElementById('systemStatus');
-
-    // Diagnostic Results
-    const verdictBanner = document.getElementById('verdictBanner');
-    const txtVerdict = document.getElementById('txtVerdict');
-    const txtConfidence = document.getElementById('txtConfidence');
-    const txtBenignProb = document.getElementById('txtBenignProb');
-    const txtMalignantProb = document.getElementById('txtMalignantProb');
-    const barBenign = document.getElementById('barBenign');
-    const barMalignant = document.getElementById('barMalignant');
-
-    // Report Items
-    const txtModelName = document.getElementById('txtModelName');
-    const txtAcousticShadow = document.getElementById('txtAcousticShadow');
-    const txtRationale = document.getElementById('txtRationale');
-
-    // Noise Lab Controls
-    const selectNoiseType = document.getElementById('selectNoiseType');
-    const rangeIntensity = document.getElementById('rangeIntensity');
-    const lblIntensityVal = document.getElementById('lblIntensityVal');
-    const btnSimulateNoise = document.getElementById('btnSimulateNoise');
-    const imgCleanView = document.getElementById('imgCleanView');
-    const imgNoisyView = document.getElementById('imgNoisyView');
-    const txtCleanResult = document.getElementById('txtCleanResult');
-    const txtNoisyResult = document.getElementById('txtNoisyResult');
-    const txtNoiseExplanation = document.getElementById('txtNoiseExplanation');
-
-    // Dataset Explorer
-    const selectDataset = document.getElementById('selectDataset');
-    const selectSplit = document.getElementById('selectSplit');
-    const datasetGrid = document.getElementById('datasetGrid');
-
-    // Thesis Reader
-    const docList = document.getElementById('docList');
-    const markdownViewer = document.getElementById('markdownViewer');
-
-    let currentFile = null;
-    let currentGt = null;
-    let currentFilename = null;
-    let activeInferenceController = null;
-    let inferenceVersion = 0;
-
-    function setStatus(message, state = 'ready') {
-        systemStatus.textContent = message;
-        systemStatus.dataset.state = state;
+    let toastTimer;
+    function toast(message) {
+        const element = byId("toast");
+        element.textContent = message;
+        element.classList.add("is-visible");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => element.classList.remove("is-visible"), 3200);
     }
 
-    async function checkModelAvailability() {
+    function showError(message) {
+        byId("errorDialogMessage").textContent = message;
+        const dialog = byId("errorDialog");
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else window.alert(message);
+    }
+
+    function setSystemStatus(message, status = "loading") {
+        byId("systemStatus").textContent = message;
+        byId("systemStatusDot").className = `status-dot ${status}`;
+    }
+
+    async function fetchJson(url, options) {
+        const response = await fetch(url, options);
+        let body;
+        try { body = await response.json(); }
+        catch { body = { detail: `Request failed with HTTP ${response.status}.` }; }
+        if (!response.ok) throw new Error(body.detail || `Request failed with HTTP ${response.status}.`);
+        return body;
+    }
+
+    function switchView(name, updateHash = true) {
+        const next = viewCopy[name] ? name : "workstation";
+        views.forEach((view) => {
+            const active = view.id === `view-${next}`;
+            view.hidden = !active;
+            view.classList.toggle("is-active", active);
+        });
+        navButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.view === next));
+        byId("viewTitle").textContent = viewCopy[next][0];
+        byId("viewDescription").textContent = viewCopy[next][1];
+        sidebar.classList.remove("is-open");
+        menuButton.setAttribute("aria-expanded", "false");
+        if (updateHash) history.replaceState(null, "", `#${next}`);
+        if (next === "evidence") loadEvidence();
+        if (next === "dataset") loadDataset();
+        if (next === "documentation" && !byId("documentViewer").dataset.loaded) loadDocument("DISSERTATION.md");
+        byId("mainContent").focus({ preventScroll: true });
+    }
+
+    navButtons.forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
+    document.querySelectorAll("[data-open-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.openView)));
+    menuButton.addEventListener("click", () => {
+        const open = sidebar.classList.toggle("is-open");
+        menuButton.setAttribute("aria-expanded", String(open));
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && sidebar.classList.contains("is-open")) {
+            sidebar.classList.remove("is-open");
+            menuButton.setAttribute("aria-expanded", "false");
+            menuButton.focus();
+        }
+    });
+
+    async function checkHealth() {
+        setSystemStatus("Checking model…", "loading");
         try {
-            const response = await fetch('/health');
-            const health = await response.json();
+            const health = await fetchJson("/health");
+            (health.models || []).forEach(({ name, ready }) => {
+                const option = modelSelect.querySelector(`option[value="${name}"]`);
+                if (option) option.disabled = !ready;
+            });
             if (health.model_ready) {
-                loadedModel.textContent = health.model || 'Trained checkpoint';
-                loadedModel.dataset.state = 'ready';
-                (health.models || []).forEach(({ name, ready }) => {
-                    const option = selectModelBackbone?.querySelector(`option[value="${name}"]`);
-                    if (option) option.disabled = !ready;
-                });
-                if (health.model) selectModelBackbone.value = health.model;
-                setStatus('Ready', 'ready');
-                return;
+                modelSelect.value = health.model || modelSelect.value;
+                byId("loadedModel").textContent = health.model || "Available";
+                setSystemStatus("Model ready", "ready");
+            } else {
+                byId("loadedModel").textContent = "Unavailable";
+                setSystemStatus("Checkpoint unavailable", "error");
             }
-            loadedModel.textContent = 'Checkpoint unavailable';
-            loadedModel.dataset.state = 'error';
-            setStatus('Model unavailable', 'error');
-        } catch {
-            loadedModel.textContent = 'Server unavailable';
-            loadedModel.dataset.state = 'error';
-            setStatus('Server unavailable', 'error');
+        } catch (error) {
+            byId("loadedModel").textContent = "Server unavailable";
+            setSystemStatus("Server unavailable", "error");
         }
     }
 
-    checkModelAvailability();
+    function totalImages(counts = {}) {
+        return Object.values(counts).reduce((sum, split) => sum + Object.values(split).reduce((a, b) => a + b, 0), 0);
+    }
 
-    // --- Tab Navigation Handler ---
-    function switchTab(activeBtn, activeView) {
-        [btnUiMode, btnNoiseMode, btnDatasetMode, btnThesisMode].forEach(b => b?.classList.remove('active'));
-        [viewWorkstation, viewNoiseLab, viewDataset, viewThesis].forEach(v => v?.classList.remove('active'));
+    function renderAudit(audit) {
+        const passed = audit.audit_passed === true;
+        const failed = audit.failed_datasets || ["busi", "oasbud", "breast"].filter((name) => {
+            const item = audit[name] || {};
+            return item.subject_ids_verifiable === false || Object.keys(item.cross_split_subjects || {}).length;
+        });
+        byId("evidenceStrip").classList.toggle("is-passed", passed);
+        byId("auditSummary").textContent = passed
+            ? "All included datasets passed identifier and cross-partition checks."
+            : `Subject-level audit failed for ${failed.join(", ") || "the current cohort"}; metrics are engineering evidence only.`;
+        byId("auditBadge").textContent = passed ? "Passed" : "Failed";
+        byId("auditBadge").className = `status-badge ${passed ? "success" : "danger"}`;
+        byId("auditDetail").textContent = passed
+            ? "No cross-partition subject identifiers were found in the audited cohort."
+            : "Known related images cross partitions, or source identifiers are insufficient to prove separation. Rebuild the cohort before reporting patient-independent performance.";
 
-        activeBtn.classList.add('active');
-        activeView.classList.add('active');
+        const grid = byId("auditGrid");
+        grid.replaceChildren();
+        ["busi", "oasbud", "breast"].forEach((name) => {
+            const item = audit[name] || {};
+            const leaks = Object.keys(item.cross_split_subjects || {});
+            const article = document.createElement("article");
+            const heading = document.createElement("h4");
+            const count = document.createElement("small");
+            const detail = document.createElement("p");
+            heading.textContent = name;
+            count.textContent = `${totalImages(item.counts)} images in current folders`;
+            detail.textContent = item.subject_ids_verifiable === false
+                ? "Subject IDs not verifiable"
+                : leaks.length ? `Cross-split subjects: ${leaks.join(", ")}` : "No cross-split IDs detected";
+            article.append(heading, count, detail);
+            grid.append(article);
+        });
+    }
 
-        if (activeView === viewDataset) {
-            loadDatasetGrid();
-        } else if (activeView === viewThesis && !markdownViewer.dataset.loaded) {
-            loadThesisDocument('IMAGE_RESIZING_AND_CROPPING_NOISE_ANALYSIS.md');
+    async function loadAudit() {
+        try {
+            const audit = await fetchJson("/api/data-audit");
+            renderAudit(audit);
+            return audit;
+        } catch (error) {
+            byId("auditSummary").textContent = "No audit file is available. Run scripts/audit_data.py before interpreting results.";
+            byId("auditDetail").textContent = error.message;
+            byId("auditBadge").textContent = "Unavailable";
+            return null;
         }
     }
 
-    btnUiMode?.addEventListener('click', () => switchTab(btnUiMode, viewWorkstation));
-    btnNoiseMode?.addEventListener('click', () => switchTab(btnNoiseMode, viewNoiseLab));
-    btnDatasetMode?.addEventListener('click', () => switchTab(btnDatasetMode, viewDataset));
-    btnThesisMode?.addEventListener('click', () => switchTab(btnThesisMode, viewThesis));
-
-    // --- File Upload & Dropzone Handlers ---
-    dropzone?.addEventListener('click', (e) => {
-        if (!e.target.closest('button')) {
-            fileInput.click();
+    async function loadEvidence() {
+        try {
+            const [payload] = await Promise.all([fetchJson("/api/benchmarks"), loadAudit()]);
+            const metrics = payload.metrics;
+            const summary = metrics.summary || {};
+            byId("metricSamples").textContent = metrics.samples ?? "—";
+            byId("metricAccuracy").textContent = Number.isFinite(summary.accuracy) ? `${(summary.accuracy * 100).toFixed(2)}%` : "—";
+            byId("metricF1").textContent = Number.isFinite(summary.macro_f1) ? summary.macro_f1.toFixed(4) : "—";
+            byId("metricAuc").textContent = Number.isFinite(summary.roc_auc) ? summary.roc_auc.toFixed(4) : "—";
+            const generated = metrics.generated_at_utc ? new Date(metrics.generated_at_utc).toLocaleString() : "legacy run timestamp unavailable";
+            byId("metricsProvenance").textContent = `${metrics.model_name || "Model"} · ${metrics.split || "test"} split · ${generated} · evidence status: ${metrics.evidence_status || "provisional"}.`;
+            const list = byId("unavailableList");
+            list.replaceChildren(...(payload.unavailable || []).map((item) => {
+                const li = document.createElement("li");
+                li.textContent = item;
+                return li;
+            }));
+            [byId("confusionImage"), byId("rocImage")].forEach((image) => {
+                const base = image.src.split("?")[0];
+                image.src = `${base}?v=${Date.now()}`;
+            });
+            state.evidenceLoaded = true;
+        } catch (error) {
+            byId("metricsProvenance").textContent = error.message;
+            toast("Evidence files could not be loaded.");
         }
-    });
+    }
+    byId("refreshEvidenceButton").addEventListener("click", loadEvidence);
 
-    btnBrowse?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fileInput.click();
-    });
+    function inferenceForm(file, groundTruth = null) {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("use_clahe", String(claheToggle.checked));
+        form.append("crop_strategy", cropSelect.value);
+        form.append("model_name", modelSelect.value);
+        if (groundTruth) form.append("ground_truth", groundTruth);
+        return form;
+    }
 
-    btnLoadSample?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        loadSampleScan();
-    });
+    function setSourcePreview(file, groundTruth) {
+        if (state.imageObjectUrl) URL.revokeObjectURL(state.imageObjectUrl);
+        state.imageObjectUrl = URL.createObjectURL(file);
+        byId("sourceImage").src = state.imageObjectUrl;
+        byId("sourceMeta").textContent = groundTruth ? `${file.name} · known label ${groundTruth.toLowerCase()}` : file.name;
+    }
 
-    btnChangeImage?.addEventListener('click', () => {
-        activeInferenceController?.abort();
-        viewportArea.classList.add('hidden');
-        dropzone.classList.remove('hidden');
-        setStatus('Ready', 'ready');
-    });
+    function renderInference(result) {
+        state.inference = result;
+        byId("outputHeading").textContent = result.prediction?.toLowerCase() || "Unavailable";
+        byId("confidenceValue").textContent = Number.isFinite(result.confidence) ? `${result.confidence.toFixed(2)}%` : "—";
+        const benign = Number(result.probabilities?.benign || 0);
+        const malignant = Number(result.probabilities?.malignant || 0);
+        byId("benignValue").textContent = `${benign.toFixed(2)}%`;
+        byId("malignantValue").textContent = `${malignant.toFixed(2)}%`;
+        byId("benignBar").value = benign;
+        byId("malignantBar").value = malignant;
+        byId("benignBar").textContent = `${benign.toFixed(2)}%`;
+        byId("malignantBar").textContent = `${malignant.toFixed(2)}%`;
+        const morphology = result.morphology || {};
+        byId("descriptorEcho").textContent = morphology.echogenicity || "Not estimated";
+        byId("descriptorMargin").textContent = morphology.margin || "Not estimated";
+        byId("descriptorPosterior").textContent = morphology.posterior_transmission || "Not estimated";
+        byId("descriptorOrientation").textContent = morphology.orientation || "Not estimated";
+        byId("resultRationale").textContent = result.research_report?.rationale || result.research_notice || "Research output only.";
+        selectImageMode("gradcam");
+    }
 
-    fileInput?.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleFileUpload(e.target.files[0]);
+    function selectImageMode(mode) {
+        if (!state.inference) return;
+        const sources = {
+            gradcam: [state.inference.gradcam_image, "Grad-CAM overlay"],
+            processed: [state.inference.processed_image, "Processed model input"],
+            clahe: [state.inference.clahe_image, "CLAHE preview"],
+            raw: [state.inference.original_image, "Source image"],
+        };
+        const [src, label] = sources[mode] || sources.gradcam;
+        byId("inspectionImage").src = src;
+        byId("inspectionImage").alt = label;
+        byId("inspectionLabel").textContent = label;
+        document.querySelectorAll("[data-image-mode]").forEach((button) => button.classList.toggle("is-active", button.dataset.imageMode === mode));
+    }
+    document.querySelectorAll("[data-image-mode]").forEach((button) => button.addEventListener("click", () => selectImageMode(button.dataset.imageMode)));
+
+    async function runSingle(file, groundTruth = null) {
+        if (!file) return;
+        state.currentFile = file;
+        state.currentGroundTruth = groundTruth;
+        state.inference = null;
+        byId("consensusPanel").classList.add("is-hidden");
+        byId("singleDropzone").classList.add("is-hidden");
+        byId("inferenceLayout").classList.remove("is-hidden");
+        byId("compareButton").disabled = true;
+        setSourcePreview(file, groundTruth);
+        setSystemStatus("Running inference…", "loading");
+        try {
+            const result = await fetchJson("/predict", { method: "POST", body: inferenceForm(file, groundTruth) });
+            renderInference(result);
+            byId("compareButton").disabled = false;
+            byId("loadedModel").textContent = result.model_name || modelSelect.value;
+            setSystemStatus("Model ready", "ready");
+        } catch (error) {
+            setSystemStatus("Inference failed", "error");
+            showError(error.message);
         }
+    }
+
+    async function loadLabelledExample() {
+        const cohort = await fetchJson("/api/dataset/cohort?dataset=busi&split=val&count=1");
+        if (!cohort.length) throw new Error("No labelled example is available in the selected local folders.");
+        const item = cohort[0];
+        const response = await fetch(item.url);
+        if (!response.ok) throw new Error("The example image could not be loaded.");
+        const file = new File([await response.blob()], item.name, { type: response.headers.get("content-type") || "image/png" });
+        return { file, groundTruth: item.ground_truth };
+    }
+
+    byId("singleFile").addEventListener("change", (event) => runSingle(event.target.files[0]));
+    byId("singleDropzone").addEventListener("click", () => byId("singleFile").click());
+    ["dragenter", "dragover"].forEach((name) => byId("singleDropzone").addEventListener(name, (event) => {
+        event.preventDefault();
+        byId("singleDropzone").classList.add("is-dragging");
+    }));
+    ["dragleave", "drop"].forEach((name) => byId("singleDropzone").addEventListener(name, (event) => {
+        event.preventDefault();
+        byId("singleDropzone").classList.remove("is-dragging");
+    }));
+    byId("singleDropzone").addEventListener("drop", (event) => runSingle(event.dataTransfer.files[0]));
+    byId("loadSampleButton").addEventListener("click", async () => {
+        try { const sample = await loadLabelledExample(); await runSingle(sample.file, sample.groundTruth); }
+        catch (error) { showError(error.message); }
     });
 
-    dropzone?.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('hover');
+    [modelSelect, cropSelect, claheToggle].forEach((control) => control.addEventListener("change", () => {
+        if (state.currentFile) runSingle(state.currentFile, state.currentGroundTruth);
+    }));
+
+    byId("compareButton").addEventListener("click", async () => {
+        if (!state.currentFile) return;
+        const button = byId("compareButton");
+        button.disabled = true;
+        button.textContent = "Comparing…";
+        try {
+            const form = new FormData();
+            form.append("file", state.currentFile);
+            form.append("use_clahe", String(claheToggle.checked));
+            form.append("crop_strategy", cropSelect.value);
+            const data = await fetchJson("/predict/compare", { method: "POST", body: form });
+            const grid = byId("comparisonGrid");
+            grid.replaceChildren();
+            Object.entries(data.models || {}).forEach(([name, result]) => {
+                const article = document.createElement("article");
+                const heading = document.createElement("h4");
+                const detail = document.createElement("p");
+                heading.textContent = name.replaceAll("_", " ");
+                detail.textContent = result.error ? `Unavailable: ${result.error}` : `${result.prediction} · ${Number(result.confidence).toFixed(2)}%`;
+                article.append(heading, detail);
+                grid.append(article);
+            });
+            byId("consensusStatus").textContent = `${data.agreement_ratio || 0}% agreement`;
+            byId("consensusPanel").classList.remove("is-hidden");
+        } catch (error) { showError(error.message); }
+        finally { button.disabled = false; button.textContent = "Compare available models"; }
     });
 
-    dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('hover'));
+    byId("noiseIntensity").addEventListener("input", (event) => { byId("noiseIntensityValue").textContent = Number(event.target.value).toFixed(2); });
+    byId("noiseSampleButton").addEventListener("click", async () => {
+        try {
+            const sample = state.currentFile ? { file: state.currentFile } : await loadLabelledExample();
+            state.noiseFile = sample.file;
+            byId("runNoiseButton").disabled = false;
+            toast(`Noise input ready: ${sample.file.name}`);
+        } catch (error) { showError(error.message); }
+    });
 
-    dropzone?.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('hover');
-        if (e.dataTransfer.files.length > 0) {
-            handleFileUpload(e.dataTransfer.files[0]);
+    function renderNoiseStage(key, value) {
+        const card = document.querySelector(`[data-stage="${key}"]`);
+        card.querySelector("header strong").textContent = value.prediction || "—";
+        const frame = card.querySelector(".stage-image");
+        const image = new Image();
+        image.src = value.image;
+        image.alt = `${card.querySelector("header span").textContent} processed image`;
+        frame.replaceChildren(image);
+        const values = card.querySelectorAll("dd");
+        values[0].textContent = Number.isFinite(value.confidence) ? `${Number(value.confidence).toFixed(2)}%` : "—";
+        values[1].textContent = Number.isFinite(value.ssim) ? Number(value.ssim).toFixed(4) : "—";
+    }
+
+    byId("runNoiseButton").addEventListener("click", async () => {
+        if (!state.noiseFile) return;
+        const button = byId("runNoiseButton");
+        button.disabled = true;
+        button.textContent = "Running…";
+        const form = new FormData();
+        form.append("file", state.noiseFile);
+        form.append("noise_type", byId("noiseType").value);
+        form.append("intensity", byId("noiseIntensity").value);
+        form.append("col3_strategy", byId("noiseComparator").value);
+        form.append("use_clahe", String(claheToggle.checked));
+        form.append("model_name", modelSelect.value);
+        form.append("seed", byId("noiseSeed").value);
+        try {
+            const data = await fetchJson("/api/noise/simulate", { method: "POST", body: form });
+            ["stage1_clean", "stage2_noisy", "stage3_direct", "stage4_roi"].forEach((key) => renderNoiseStage(key, data[key]));
+            byId("noiseExplanation").textContent = `${data.explanation} Seed ${data.seed}; model ${data.model_name}. Interpret only as a controlled single-image demonstration.`;
+        } catch (error) { showError(error.message); }
+        finally { button.disabled = false; button.textContent = "Run experiment"; }
+    });
+
+    async function runBatch(files, labels = new Map()) {
+        if (!files.length) return;
+        state.batchLabels = labels;
+        const form = new FormData();
+        files.forEach((file) => form.append("files", file));
+        form.append("use_clahe", String(claheToggle.checked));
+        form.append("crop_strategy", cropSelect.value);
+        form.append("model_name", modelSelect.value);
+        setSystemStatus("Processing batch…", "loading");
+        try {
+            const data = await fetchJson("/predict/batch", { method: "POST", body: form });
+            state.batchResults = (data.results || []).map((result) => ({ ...result, ground_truth: labels.get(result.filename) || "—" }));
+            byId("batchProcessed").textContent = data.cohort_summary?.processed_scans ?? 0;
+            byId("batchBenign").textContent = data.cohort_summary?.benign_count ?? 0;
+            byId("batchMalignant").textContent = data.cohort_summary?.malignant_count ?? 0;
+            const mean = data.cohort_summary?.average_confidence;
+            byId("batchConfidence").textContent = Number.isFinite(mean) ? `${Number(mean).toFixed(2)}%` : "—";
+            byId("exportBatchButton").disabled = !state.batchResults.length;
+            renderBatch();
+            setSystemStatus("Model ready", "ready");
+        } catch (error) {
+            setSystemStatus("Batch failed", "error");
+            showError(error.message);
         }
-    });
+    }
 
-    // --- Dynamic Re-run on Setting Change ---
-    selectModelBackbone?.addEventListener('change', () => { if (currentFile) runDiagnosticInference(currentFile); });
-    selectCropStrategy?.addEventListener('change', () => { if (currentFile) runDiagnosticInference(currentFile); });
-    chkUseClahe?.addEventListener('change', () => { if (currentFile) runDiagnosticInference(currentFile); });
-
-    function handleFileUpload(file) {
-        const allowedTypes = ['image/png', 'image/jpeg', 'image/tiff'];
-        const allowedExtensions = /\.(png|jpe?g|tiff?)$/i;
-        if ((!allowedTypes.includes(file.type) && !allowedExtensions.test(file.name)) || file.size > 20 * 1024 * 1024) {
-            setStatus('Use a PNG, JPG, or TIFF under 20 MB', 'error');
+    function renderBatch() {
+        const filter = byId("batchFilter").value;
+        const rows = state.batchResults.filter((result) => {
+            if (filter === "all") return true;
+            if (filter === "error") return result.status !== "success";
+            return result.prediction?.toLowerCase() === filter;
+        });
+        const body = byId("batchBody");
+        body.replaceChildren();
+        if (!rows.length) {
+            const row = body.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 6;
+            cell.className = "empty-cell";
+            cell.textContent = "No results match this filter.";
             return;
         }
-        currentFile = file;
-        currentGt = null;
-        currentFilename = file.name;
-        runDiagnosticInference(file);
-    }
-
-    async function loadSampleScan(dataset = 'busi') {
-        try {
-            const res = await fetch(`/api/dataset/files?dataset=${dataset}&split=val`);
-            if (res.ok) {
-                const files = await res.json();
-                if (files && files.length > 0) {
-                    const item = files[0];
-                    currentFile = item.url;
-                    currentGt = item.class.toUpperCase();
-                    currentFilename = item.name;
-                    runDiagnosticInference(item.url, currentGt, currentFilename);
-                    return item;
-                }
-            }
-        } catch (err) {
-            console.error('Failed to load sample scan for dataset:', dataset, err);
-        }
-        const fallbackUrl = `/api/dataset/file/val/malignant/sample_0.png?dataset=${dataset}`;
-        currentFile = fallbackUrl;
-        currentGt = 'MALIGNANT';
-        currentFilename = 'sample_0.png';
-        runDiagnosticInference(fallbackUrl, currentGt, currentFilename);
-        return { url: fallbackUrl, class: 'MALIGNANT', name: 'sample_0.png' };
-    }
-
-    // --- Diagnostic Inference Function ---
-    async function runDiagnosticInference(fileOrUrl, explicitGt = null, explicitFilename = null) {
-        const requestVersion = ++inferenceVersion;
-        activeInferenceController?.abort();
-        activeInferenceController = new AbortController();
-        setStatus('Processing…', 'loading');
-
-        if (explicitGt) currentGt = explicitGt;
-        if (explicitFilename) currentFilename = explicitFilename;
-
-        const formData = new FormData();
-        if (fileOrUrl instanceof File) {
-            formData.append('file', fileOrUrl);
-        } else if (typeof fileOrUrl === 'string') {
-            try {
-                const res = await fetch(fileOrUrl);
-                const blob = await res.blob();
-                const fname = currentFilename || (fileOrUrl.split('/').pop().split('?')[0]);
-                formData.append('file', blob, fname);
-            } catch (err) {
-                console.error('Failed to fetch sample image url:', err);
-                systemStatus.textContent = 'Fetch Error';
-                return;
-            }
-        }
-
-        if (currentGt) {
-            formData.append('ground_truth', currentGt);
-        }
-
-        formData.append('use_clahe', chkUseClahe.checked);
-        formData.append('crop_strategy', selectCropStrategy.value);
-        formData.append('model_name', selectModelBackbone.value);
-        try {
-            const response = await fetch('/predict', {
-                method: 'POST',
-                body: formData,
-                signal: activeInferenceController.signal
+        rows.forEach((result) => {
+            const row = body.insertRow();
+            const values = result.status === "success"
+                ? [result.filename, result.ground_truth, result.prediction, `${Number(result.confidence).toFixed(2)}%`, (result.output_band || "—").replaceAll("_", " "), "research output"]
+                : [result.filename, result.ground_truth, "—", "—", "—", result.error || result.status];
+            values.forEach((value, index) => {
+                const cell = row.insertCell();
+                cell.textContent = value;
+                if (index === 5) cell.className = "table-status";
             });
-
-            if (!response.ok) {
-                const detail = await response.json().catch(() => ({}));
-                const msg = detail.detail || 'Inference failed';
-                if (msg.includes('NON_BREAST_ULTRASOUND')) {
-                    displayRejectionResult(msg);
-                    setStatus('Non-Ultrasound Study Rejected', 'error');
-                } else {
-                    setStatus(msg, 'error');
-                }
-                return;
-            }
-
-            const data = await response.json();
-            if (requestVersion !== inferenceVersion) return;
-            if (explicitGt) {
-                data.ground_truth = explicitGt;
-            }
-            displayDiagnosticResults(data);
-            setStatus('Complete', 'success');
-
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.error('Inference error:', err);
-                setStatus('Server error: please try again', 'error');
-            }
-        }
-    }
-
-    // --- Display Diagnostic Results ---
-    function displayDiagnosticResults(data) {
-        viewportArea.classList.remove('hidden');
-        dropzone.classList.add('hidden');
-        btnChangeImage.classList.remove('hidden');
-
-        document.getElementById('phOriginal')?.classList.add('hidden');
-        document.getElementById('phSpotlight')?.classList.add('hidden');
-
-        imgOriginal.src = data.original_image;
-        imgOriginal.alt = `Original ultrasound scan: ${data.filename || 'uploaded image'}`;
-        imgOriginal.classList.remove('hidden');
-
-        imgSpotlight.src = data.processed_image;
-        imgSpotlight.alt = `Research visualisation with localized region overlay: ${data.prediction}`;
-        imgSpotlight.classList.remove('hidden');
-
-        // Ground Truth Tag Badge
-        const gtBadge = document.getElementById('gtTagBadge');
-        const gt = (data.ground_truth || 'UNKNOWN').toUpperCase();
-        if (gtBadge) {
-            gtBadge.classList.remove('hidden');
-            gtBadge.textContent = `GT Tag: ${gt}`;
-            gtBadge.className = 'gt-tag-badge ' + (gt === 'BENIGN' ? 'benign' : (gt === 'MALIGNANT' ? 'malignant' : 'unknown'));
-        }
-
-        // Verdict Banner
-        const pred = data.prediction.toUpperCase();
-        txtVerdict.textContent = pred;
-        txtConfidence.textContent = `${data.confidence}%`;
-
-        verdictBanner.className = 'verdict-banner ' + (pred === 'BENIGN' ? 'benign' : 'malignant');
-
-        // Probability Bars
-        const bProb = data.probabilities.benign || 0;
-        const mProb = data.probabilities.malignant || 0;
-
-        txtBenignProb.textContent = `${bProb}%`;
-        txtMalignantProb.textContent = `${mProb}%`;
-        barBenign.style.transform = `scaleX(${bProb / 100})`;
-        barMalignant.style.transform = `scaleX(${mProb / 100})`;
-
-        txtModelName.textContent = data.model_name || '--';
-        txtAcousticShadow.textContent = data.noise_analysis?.dominant_type || '--';
-        txtRationale.textContent = data.research_notice || 'Experimental research output only. Not for clinical use.';
-    }
-
-    function displayRejectionResult(message) {
-        viewportArea.classList.remove('hidden');
-        dropzone.classList.add('hidden');
-        btnChangeImage.classList.remove('hidden');
-
-        const gtBadge = document.getElementById('gtTagBadge');
-        if (gtBadge) {
-            gtBadge.classList.remove('hidden');
-            gtBadge.textContent = 'REJECTED: NON-ULTRASOUND';
-            gtBadge.className = 'gt-tag-badge unknown';
-        }
-
-        txtVerdict.textContent = 'NON-BREAST ULTRASOUND';
-        txtConfidence.textContent = '0.0%';
-        verdictBanner.className = 'verdict-banner unknown';
-
-        txtBenignProb.textContent = '0.0%';
-        txtMalignantProb.textContent = '0.0%';
-        barBenign.style.transform = 'scaleX(0)';
-        barMalignant.style.transform = 'scaleX(0)';
-
-        txtModelName.textContent = 'Domain Validation Engine';
-        txtAcousticShadow.textContent = 'Non-Medical Study';
-        txtRationale.textContent = '⚠️ ' + message.replace('NON_BREAST_ULTRASOUND: ', '');
-
-        // Pop up the Rejection Modal
-        openRejectionModal(message);
-    }
-
-    // --- NON-BREAST ULTRASOUND REJECTION MODAL CONTROLLER ---
-    const modalRejection = document.getElementById('modalRejection');
-    const modalRejectionMessage = document.getElementById('modalRejectionMessage');
-    const btnModalClose = document.getElementById('btnModalClose');
-    const btnModalDismiss = document.getElementById('btnModalDismiss');
-
-    function openRejectionModal(rawMessage) {
-        if (!modalRejection) return;
-        const cleanMsg = rawMessage.replace('NON_BREAST_ULTRASOUND: ', '');
-        if (modalRejectionMessage) {
-            modalRejectionMessage.textContent = cleanMsg;
-        }
-        modalRejection.classList.remove('hidden');
-    }
-
-    function closeRejectionModal() {
-        if (modalRejection) {
-            modalRejection.classList.add('hidden');
-        }
-        activeInferenceController?.abort();
-        viewportArea.classList.add('hidden');
-        dropzone.classList.remove('hidden');
-        setStatus('Ready', 'ready');
-    }
-
-    btnModalClose?.addEventListener('click', closeRejectionModal);
-    btnModalDismiss?.addEventListener('click', () => {
-        closeRejectionModal();
-        fileInput?.click();
-    });
-    modalRejection?.addEventListener('click', (e) => {
-        if (e.target === modalRejection) closeRejectionModal();
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalRejection && !modalRejection.classList.contains('hidden')) {
-            closeRejectionModal();
-        }
-    });
-
-    // --- Noise Laboratory 4-Column Suite Handler ---
-    const selectNoiseDataset = document.getElementById('selectNoiseDataset');
-    const btnNoiseLoadSample = document.getElementById('btnNoiseLoadSample');
-
-    const selectCol3Strategy = document.getElementById('selectCol3Strategy');
-    const selectCol4Strategy = document.getElementById('selectCol4Strategy');
-
-    const imgCol1Clean = document.getElementById('imgCol1Clean');
-    const txtCol1Pred = document.getElementById('txtCol1Pred');
-    const txtCol1Conf = document.getElementById('txtCol1Conf');
-    const cardCol1Verdict = document.getElementById('cardCol1Verdict');
-
-    const imgCol2Noisy = document.getElementById('imgCol2Noisy');
-    const txtCol2Pred = document.getElementById('txtCol2Pred');
-    const txtCol2Conf = document.getElementById('txtCol2Conf');
-    const cardCol2Verdict = document.getElementById('cardCol2Verdict');
-
-    const imgCol3Direct = document.getElementById('imgCol3Direct');
-    const txtCol3Pred = document.getElementById('txtCol3Pred');
-    const txtCol3Conf = document.getElementById('txtCol3Conf');
-    const cardCol3Verdict = document.getElementById('cardCol3Verdict');
-
-    const imgCol4Roi = document.getElementById('imgCol4Roi');
-    const txtCol4Pred = document.getElementById('txtCol4Pred');
-    const txtCol4Conf = document.getElementById('txtCol4Conf');
-    const cardCol4Verdict = document.getElementById('cardCol4Verdict');
-
-    rangeIntensity?.addEventListener('input', (e) => {
-        lblIntensityVal.textContent = parseFloat(e.target.value).toFixed(2);
-    });
-
-    selectNoiseDataset?.addEventListener('change', async () => {
-        const dataset = selectNoiseDataset.value;
-        await loadSampleScan(dataset);
-        setTimeout(runNoiseAnalysisSuite, 350);
-    });
-
-    btnNoiseLoadSample?.addEventListener('click', async () => {
-        const dataset = selectNoiseDataset.value;
-        await loadSampleScan(dataset);
-        setTimeout(runNoiseAnalysisSuite, 350);
-    });
-
-    selectCol3Strategy?.addEventListener('change', runNoiseAnalysisSuite);
-    selectNoiseType?.addEventListener('change', runNoiseAnalysisSuite);
-
-    async function runNoiseAnalysisSuite() {
-        if (!currentFile) {
-            const dataset = selectNoiseDataset.value || 'busi';
-            await loadSampleScan(dataset);
-        }
-
-        const formData = new FormData();
-        if (currentFile instanceof File) {
-            formData.append('file', currentFile);
-        } else {
-            const res = await fetch(currentFile);
-            const blob = await res.blob();
-            formData.append('file', blob, 'sample.png');
-        }
-
-        formData.append('noise_type', selectNoiseType.value);
-        formData.append('intensity', rangeIntensity.value);
-        formData.append('use_clahe', chkUseClahe.checked);
-        if (selectCol3Strategy) formData.append('col3_strategy', selectCol3Strategy.value);
-        formData.append('model_name', selectModelBackbone.value);
-        formData.append('seed', '42');
-
-        try {
-            const response = await fetch('/api/noise/simulate', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                alert('Noise simulation failed.');
-                return;
-            }
-
-            const resData = await response.json();
-
-            // Column 1: Clean
-            if (resData.stage1_clean) {
-                document.getElementById('phCol1')?.classList.add('hidden');
-                imgCol1Clean.src = resData.stage1_clean.image;
-                imgCol1Clean.classList.remove('hidden');
-                txtCol1Pred.textContent = resData.stage1_clean.prediction;
-                txtCol1Conf.textContent = `${resData.stage1_clean.confidence}%`;
-                cardCol1Verdict.className = 'verdict-mini-card ' + (resData.stage1_clean.prediction === 'BENIGN' ? 'success' : 'malignant');
-            }
-
-            // Column 2: Noisy Uncropped
-            if (resData.stage2_noisy) {
-                document.getElementById('phCol2')?.classList.add('hidden');
-                imgCol2Noisy.src = resData.stage2_noisy.image;
-                imgCol2Noisy.classList.remove('hidden');
-                txtCol2Pred.textContent = resData.stage2_noisy.prediction;
-                txtCol2Conf.textContent = `${resData.stage2_noisy.confidence}%`;
-                cardCol2Verdict.className = 'verdict-mini-card ' + (resData.stage2_noisy.prediction === 'BENIGN' ? 'success' : 'malignant');
-            }
-
-            // Column 3: Strategy A
-            if (resData.stage3_direct) {
-                document.getElementById('phCol3')?.classList.add('hidden');
-                imgCol3Direct.src = resData.stage3_direct.image;
-                imgCol3Direct.classList.remove('hidden');
-                txtCol3Pred.textContent = resData.stage3_direct.prediction;
-                txtCol3Conf.textContent = `${resData.stage3_direct.confidence}%`;
-                cardCol3Verdict.className = 'verdict-mini-card ' + (resData.stage3_direct.prediction === 'BENIGN' ? 'success' : 'warning');
-            }
-
-            // Column 4: Strategy B
-            if (resData.stage4_roi) {
-                document.getElementById('phCol4')?.classList.add('hidden');
-                imgCol4Roi.src = resData.stage4_roi.image;
-                imgCol4Roi.classList.remove('hidden');
-                txtCol4Pred.textContent = resData.stage4_roi.prediction;
-                txtCol4Conf.textContent = `${resData.stage4_roi.confidence}%`;
-                cardCol4Verdict.className = 'verdict-mini-card ' + (resData.stage4_roi.prediction === 'BENIGN' ? 'success' : 'malignant');
-            }
-
-            const delta = resData.deltas || {};
-            txtNoiseExplanation.textContent = `${resData.explanation} Same noise realization (seed ${resData.seed}) · noise vs clean: ${delta.noise_vs_clean >= 0 ? '+' : ''}${delta.noise_vs_clean ?? '--'} pts · method A vs noise: ${delta.method_a_vs_noise >= 0 ? '+' : ''}${delta.method_a_vs_noise ?? '--'} pts · proposed ROI vs noise: ${delta.proposed_vs_noise >= 0 ? '+' : ''}${delta.proposed_vs_noise ?? '--'} pts. These are observed model outputs, not adjusted percentages.`;
-
-        } catch (err) {
-            console.error('Noise simulation error:', err);
-        }
-    }
-
-    btnSimulateNoise?.addEventListener('click', runNoiseAnalysisSuite);
-
-    // --- Dataset Explorer Loader ---
-    async function loadDatasetGrid() {
-        const dataset = selectDataset.value;
-        const split = selectSplit.value;
-
-        datasetGrid.innerHTML = '<p class="placeholder-text">Loading dataset items...</p>';
-
-        try {
-            const res = await fetch(`/api/dataset/files?dataset=${dataset}&split=${split}`);
-            if (!res.ok) return;
-
-            const files = await res.json();
-            datasetGrid.innerHTML = '';
-
-            if (!files.length) {
-                datasetGrid.innerHTML = '<p class="placeholder-text">No images are available in this dataset partition.</p>';
-                return;
-            }
-            files.slice(0, 30).forEach(item => {
-                const card = document.createElement('button');
-                card.type = 'button';
-                card.className = 'dataset-card';
-                const image = document.createElement('img');
-                image.src = item.url;
-                image.alt = `Dataset scan: ${item.name}`;
-                image.loading = 'lazy';
-                const name = document.createElement('span');
-                name.className = 'd-name';
-                name.textContent = item.name;
-                const classification = document.createElement('span');
-                classification.className = `d-class ${item.class}`;
-                classification.textContent = item.class;
-                card.append(image, name, classification);
-                card.addEventListener('click', () => {
-                    switchTab(btnUiMode, viewWorkstation);
-                    currentFile = item.url;
-                    runDiagnosticInference(item.url, item.class.toUpperCase(), item.name);
-                });
-                datasetGrid.appendChild(card);
-            });
-        } catch (err) {
-            console.error('Failed to load dataset files:', err);
-            datasetGrid.innerHTML = '<p class="placeholder-text">Dataset items could not be loaded. Try again when the server is available.</p>';
-        }
-    }
-
-    selectDataset?.addEventListener('change', loadDatasetGrid);
-    selectSplit?.addEventListener('change', loadDatasetGrid);
-
-    // --- Thesis Markdown Reader ---
-    docList?.querySelectorAll('.doc-item').forEach(item => {
-        item.addEventListener('click', () => {
-            docList.querySelectorAll('.doc-item').forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-            loadThesisDocument(item.dataset.file);
         });
+    }
+
+    byId("batchFiles").addEventListener("change", (event) => runBatch([...event.target.files]));
+    byId("loadCohortButton").addEventListener("click", async () => {
+        const button = byId("loadCohortButton");
+        button.disabled = true;
+        button.textContent = "Loading…";
+        try {
+            const cohort = await fetchJson("/api/dataset/cohort?dataset=busi&split=test&count=12");
+            const files = await Promise.all(cohort.map(async (item) => {
+                const response = await fetch(item.url);
+                if (!response.ok) throw new Error(`Could not load ${item.name}.`);
+                return new File([await response.blob()], `${item.ground_truth}_${item.name}`, { type: response.headers.get("content-type") || "image/png" });
+            }));
+            const labels = new Map(cohort.map((item) => [`${item.ground_truth}_${item.name}`, item.ground_truth]));
+            await runBatch(files, labels);
+        } catch (error) { showError(error.message); }
+        finally { button.disabled = false; button.textContent = "Load labelled cohort"; }
+    });
+    byId("batchFilter").addEventListener("change", renderBatch);
+
+    function csvCell(value) { return `"${String(value ?? "").replaceAll('"', '""')}"`; }
+    byId("exportBatchButton").addEventListener("click", () => {
+        const header = ["filename", "known_label", "model_output", "softmax_score_percent", "output_band", "status"];
+        const lines = [header, ...state.batchResults.map((r) => [r.filename, r.ground_truth, r.prediction || "", r.confidence ?? "", r.output_band || "", r.status])];
+        const blob = new Blob([lines.map((row) => row.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "research_batch_outputs.csv";
+        link.click();
+        URL.revokeObjectURL(link.href);
     });
 
-    async function loadThesisDocument(filename) {
-        markdownViewer.innerHTML = '<p class="placeholder-text">Loading document...</p>';
+    async function loadDataset() {
+        const grid = byId("datasetGrid");
+        grid.innerHTML = '<p class="empty-state">Loading local images…</p>';
         try {
-            const response = await fetch(`/api/code/${filename}`);
-            if (!response.ok) {
-                markdownViewer.innerHTML = '<p class="placeholder-text">Document not found.</p>';
+            const dataset = byId("datasetSelect").value;
+            const split = byId("splitSelect").value;
+            const files = await fetchJson(`/api/dataset/files?dataset=${encodeURIComponent(dataset)}&split=${encodeURIComponent(split)}`);
+            grid.replaceChildren();
+            if (!files.length) {
+                byId("datasetSummary").textContent = "No images found.";
+                grid.innerHTML = '<p class="empty-state">No images were found in this folder.</p>';
                 return;
             }
-            const data = await response.json();
-            if (window.marked) {
-                markdownViewer.innerHTML = window.marked.parse(data.code);
-                if (window.renderMathInElement) {
-                    window.renderMathInElement(markdownViewer, {
-                        delimiters: [
-                            {left: '$$', right: '$$', display: true},
-                            {left: '$', right: '$', display: false},
-                            {left: '\\(', right: '\\)', display: false},
-                            {left: '\\[', right: '\\]', display: true}
-                        ]
-                    });
-                }
-            } else {
-                markdownViewer.innerHTML = `<pre>${data.code}</pre>`;
-            }
-            markdownViewer.dataset.loaded = "true";
-        } catch (err) {
-            console.error('Error loading thesis doc:', err);
-            markdownViewer.innerHTML = '<p class="placeholder-text">Error loading document.</p>';
+            const preview = files.slice(0, 24);
+            byId("datasetSummary").textContent = `Showing ${preview.length} of ${files.length} images. Counts reflect folder contents, not independent subjects.`;
+            preview.forEach((file) => {
+                const article = document.createElement("article");
+                article.className = "dataset-item";
+                const image = new Image();
+                image.loading = "lazy";
+                image.src = file.url;
+                image.alt = `${file.class} folder example ${file.name}`;
+                const meta = document.createElement("div");
+                const name = document.createElement("strong");
+                const label = document.createElement("span");
+                name.textContent = file.name;
+                label.textContent = `${file.class} folder label`;
+                meta.append(name, label);
+                article.append(image, meta);
+                grid.append(article);
+            });
+        } catch (error) {
+            byId("datasetSummary").textContent = "Dataset preview unavailable.";
+            grid.innerHTML = `<p class="empty-state">${error.message}</p>`;
         }
     }
+    byId("datasetSelect").addEventListener("change", loadDataset);
+    byId("splitSelect").addEventListener("change", loadDataset);
+
+    async function loadDocument(filename) {
+        const viewer = byId("documentViewer");
+        viewer.innerHTML = "<p>Loading document…</p>";
+        try {
+            const payload = await fetchJson(`/api/code/${encodeURIComponent(filename)}`);
+            if (window.marked) viewer.innerHTML = window.marked.parse(payload.code);
+            else {
+                const pre = document.createElement("pre");
+                pre.textContent = payload.code;
+                viewer.replaceChildren(pre);
+            }
+            viewer.dataset.loaded = filename;
+            document.querySelectorAll("[data-document]").forEach((button) => button.classList.toggle("is-active", button.dataset.document === filename));
+            if (window.renderMathInElement) window.renderMathInElement(viewer, { delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }] });
+        } catch (error) { viewer.textContent = error.message; }
+    }
+    document.querySelectorAll("[data-document]").forEach((button) => button.addEventListener("click", () => loadDocument(button.dataset.document)));
+    byId("documentViewer").addEventListener("click", (event) => {
+        const link = event.target.closest("a");
+        if (!link) return;
+        const filename = link.getAttribute("href")?.split("/").pop();
+        if (!filename || !document.querySelector(`[data-document="${CSS.escape(filename)}"]`)) return;
+        event.preventDefault();
+        loadDocument(filename);
+    });
+
+    checkHealth();
+    loadAudit();
+    switchView(location.hash.slice(1) || "workstation", false);
 });

@@ -1,6 +1,7 @@
 import os
 import io
 import base64
+import json
 from typing import List, Optional, Dict, Any, Tuple
 import cv2
 import numpy as np
@@ -15,16 +16,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 try:
     from src import config
-    from src.dataset import apply_clahe, crop_and_pad_roi
+    from src.dataset import apply_clahe, crop_and_pad_roi, preprocess_image
     from src.models import get_model
 except ImportError:
     import config
-    from dataset import apply_clahe, crop_and_pad_roi
+    from dataset import apply_clahe, crop_and_pad_roi, preprocess_image
     from models import get_model
 
 app = FastAPI(
-    title="Breast Cancer Ultrasound Classification API",
-    description="Dissertation AI Diagnostic Tool using PyTorch Deep Learning",
+    title="Breast Ultrasound Research Classification API",
+    description="Reproducibility-focused dissertation prototype; not for clinical use.",
     version="1.0.0"
 )
 
@@ -32,7 +33,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -118,7 +119,6 @@ def available_model_checkpoints() -> Dict[str, str]:
 
 
 def get_verified_model(model_name: Optional[str]) -> Tuple[torch.nn.Module, str]:
-    global model, loaded_model_name
     available = available_model_checkpoints()
     if not available:
         raise RuntimeError("No valid trained model checkpoints are available.")
@@ -135,9 +135,7 @@ def get_verified_model(model_name: Optional[str]) -> Tuple[torch.nn.Module, str]
         instance.eval()
         model_registry[requested] = instance
         model_registry_mtimes[requested] = mtime
-    model = model_registry[requested]
-    loaded_model_name = requested
-    return model, requested
+    return model_registry[requested], requested
 
 @app.on_event("startup")
 def load_pytorch_model():
@@ -180,7 +178,7 @@ def validate_ultrasound_candidate(img_np: np.ndarray) -> Optional[str]:
         
         # B-mode ultrasound is predominantly grayscale; natural color photos have high channel spread & saturation
         if (coloured_ratio > 0.18 and mean_spread > 12.0) or mean_saturation > 38.0:
-            return "NON_BREAST_ULTRASOUND: Please put in an actual breast cancer scan. The uploaded file is a natural color photo rather than a B-mode breast ultrasound study."
+            return "OUT_OF_DOMAIN_IMAGE: Upload a predominantly grayscale B-mode breast-ultrasound research image; this file appears to be a colour photograph."
 
     # 2. Luminance & Tissue Histogram Distribution Check
     gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if (len(img_np.shape) == 3 and img_np.shape[2] >= 3) else img_np
@@ -188,9 +186,9 @@ def validate_ultrasound_candidate(img_np: np.ndarray) -> Optional[str]:
     std_val = float(np.std(gray))
 
     if mean_val > 225.0:
-        return "NON_BREAST_ULTRASOUND: Please put in an actual breast cancer scan. The uploaded file is predominantly white (document/paper scan)."
+        return "OUT_OF_DOMAIN_IMAGE: Upload a B-mode breast-ultrasound research image; this file appears predominantly white or document-like."
     if mean_val < 8.0 or std_val < 6.0:
-        return "NON_BREAST_ULTRASOUND: Please put in an actual breast cancer scan. The uploaded image lacks sufficient tissue contrast or is empty."
+        return "OUT_OF_DOMAIN_IMAGE: The uploaded image lacks the minimum intensity variation required by this research pipeline."
 
     return None
 
@@ -275,17 +273,108 @@ def draw_lesion_spotlight_zoom(img_np: np.ndarray, prediction: str) -> np.ndarra
 draw_lesion_circle = draw_lesion_spotlight_zoom
 
 
+def generate_gradcam(active_model: torch.nn.Module, tensor: torch.Tensor, target_class_idx: int, model_name: str) -> Optional[np.ndarray]:
+    """
+    Computes class activation map using Gradient-weighted Class Activation Mapping (Grad-CAM).
+    Captures fine-grained convolutional features for explainable AI inspection.
+    """
+    gradients = []
+    activations = []
+
+    def backward_hook(module, grad_input, grad_output):
+        gradients.append(grad_output[0])
+
+    def forward_hook(module, input, output):
+        activations.append(output)
+
+    # Find target convolutional layer
+    target_layer = None
+    m_name = (model_name or "").lower()
+    if "resnet" in m_name and hasattr(active_model, "layer4"):
+        target_layer = active_model.layer4[-1]
+    elif "efficientnet" in m_name and hasattr(active_model, "features"):
+        target_layer = active_model.features[-1]
+    elif "custom" in m_name and hasattr(active_model, "features"):
+        for m in reversed(active_model.features):
+            if isinstance(m, torch.nn.Conv2d):
+                target_layer = m
+                break
+
+    if target_layer is None:
+        for m in reversed(list(active_model.modules())):
+            if isinstance(m, torch.nn.Conv2d):
+                target_layer = m
+                break
+
+    if target_layer is None:
+        return None
+
+    handle_fwd = target_layer.register_forward_hook(forward_hook)
+    handle_bwd = target_layer.register_full_backward_hook(backward_hook)
+
+    try:
+        tensor_input = tensor.clone().detach().requires_grad_(True)
+        active_model.zero_grad()
+        output = active_model(tensor_input)
+        if target_class_idx >= output.shape[1]:
+            target_class_idx = int(torch.argmax(output).item())
+        score = output[0, target_class_idx]
+        score.backward()
+
+        if not gradients or not activations:
+            return None
+
+        grad = gradients[0].detach().cpu().numpy()[0]
+        act = activations[0].detach().cpu().numpy()[0]
+
+        weights = np.mean(grad, axis=(1, 2))
+        cam = np.zeros(act.shape[1:], dtype=np.float32)
+        for i, w in enumerate(weights):
+            cam += w * act[i]
+
+        cam = np.maximum(cam, 0)
+        max_val = np.max(cam)
+        if max_val > 0:
+            cam = cam / max_val
+        else:
+            cam = np.zeros_like(cam)
+
+        cam = cv2.resize(cam, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_LINEAR)
+        return cam
+    except Exception as exc:
+        print(f"[Grad-CAM Warning] Grad-CAM generation failed: {exc}")
+        return None
+    finally:
+        handle_fwd.remove()
+        handle_bwd.remove()
+
+
+def overlay_gradcam_on_image(img_np: np.ndarray, cam: Optional[np.ndarray], alpha: float = 0.5) -> np.ndarray:
+    """
+    Overlays normalized Grad-CAM heatmaps over the base ultrasound image using Jet colormap.
+    """
+    if cam is None:
+        return img_np
+
+    h, w = img_np.shape[:2]
+    cam_resized = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
+    heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+
+    if len(img_np.shape) == 2:
+        base_rgb = cv2.cvtColor(img_np, cv2.COLOR_GRAY2RGB)
+    elif img_np.shape[2] == 1:
+        base_rgb = cv2.cvtColor(img_np[:, :, 0], cv2.COLOR_GRAY2RGB)
+    else:
+        base_rgb = img_np.copy()
+
+    overlay = cv2.addWeighted(base_rgb, 1.0 - alpha, heatmap, alpha, 0)
+    return overlay
+
+
 def analyze_image_noise(img_gray: np.ndarray) -> dict:
-    """
-    Analyzes and classifies the noise characteristics in a breast ultrasound scan.
-    Returns estimated noise levels and classifies the dominant noise type:
-    - Speckle Noise (acoustic interference, standard in ultrasound)
-    - Gaussian Noise (electronic sensor noise)
-    - Impulse (Salt & Pepper) Noise (pixel dropouts/transmission errors)
-    - Poisson Noise (signal-dependent noise)
-    - Low Noise (high SNR scan)
-    """
-    h, w = img_gray.shape
+    """Calculate descriptive texture proxies without inferring their physical cause."""
+    h, w = img_gray.shape[:2]
     img_float = img_gray.astype(np.float32)
 
     # 1. Speckle Noise Estimation (standard deviation to mean ratio in non-zero regions)
@@ -325,22 +414,22 @@ def analyze_image_noise(img_gray: np.ndarray) -> dict:
         "snr_db": round(snr_db, 2)
     }
 
-    # Classification Logic
+    # These thresholds label image statistics, not scanner or acquisition faults.
     if noise_metrics["impulse_level"] > 15.0:
-        dominant_type = "Impulse (Salt & Pepper) Noise"
-        description = "Isolated pixel dropout artifacts, typically caused by analog-to-digital converter errors or probe transmission interference."
+        dominant_type = "High extreme-pixel ratio"
+        description = "Many pixels differ strongly from a local median-filtered reference."
     elif noise_metrics["gaussian_level"] > 40.0:
-        dominant_type = "Gaussian (Thermal) Noise"
-        description = "Electronic sensor thermal noise, often arising from amplifier heat or low-quality transducer hardware."
+        dominant_type = "High high-frequency index"
+        description = "The normalised Laplacian-variance proxy is high."
     elif noise_metrics["speckle_level"] > 25.0:
-        dominant_type = "Speckle Noise (Acoustic)"
-        description = "Acoustic speckle pattern, which is the standard multiplicative noise in ultrasound scans caused by sub-resolution scatterer phase interference."
+        dominant_type = "High local-variation index"
+        description = "The median local coefficient-of-variation proxy is high."
     elif noise_metrics["speckle_level"] <= 10.0 and noise_metrics["gaussian_level"] <= 10.0:
-        dominant_type = "Low Noise (High Quality Scan)"
-        description = "Minimal noise detected. High signal-to-noise ratio (SNR) scan suitable for clear diagnostic observation."
+        dominant_type = "Low measured variation"
+        description = "Both local-variation and Laplacian-variance proxies are low."
     else:
-        dominant_type = "Mixed Acoustic Speckle"
-        description = "Standard combination of tissue backscatter speckling and low-level sensor thermal noise."
+        dominant_type = "Mixed texture profile"
+        description = "No single image-statistic proxy exceeds its demonstration threshold."
 
     return {
         "dominant_type": dominant_type,
@@ -348,66 +437,71 @@ def analyze_image_noise(img_gray: np.ndarray) -> dict:
         "metrics": noise_metrics
     }
 
-def compute_clinical_birads_report(pred_class: str, confidence: float, prob_dict: dict, noise_analysis: dict, model_name: str) -> dict:
-    """
-    Computes a comprehensive, stratified clinical BI-RADS report across Categories 1 to 5
-    using classification confidence, multi-class probability distribution, and acoustic noise artifacts.
-    """
-    speckle_level = noise_analysis.get("metrics", {}).get("speckle_level", 0.0)
-    dominant_noise = noise_analysis.get("dominant_type", "speckle")
+
+def compute_morphological_profile(gray_img: np.ndarray) -> dict:
+    """Calculate deterministic intensity and geometry proxies for UI inspection."""
+    h, w = gray_img.shape[:2]
+    lx, ly, r = localize_lesion(gray_img)
+
+    # 1. Hypoechoic Contrast Ratio (mass core vs surrounding parenchyma)
+    mask_lesion = np.zeros((h, w), dtype=np.uint8)
+    cv2.circle(mask_lesion, (lx, ly), max(5, r), 255, -1)
     
-    # Determine Tissue Density based on acoustic speckle noise and contrast
-    if speckle_level < 8.0:
-        density_str = "Almost Entirely Fatty (ACR A)"
-    elif speckle_level < 15.0:
-        density_str = "Scattered Fibroglandular (ACR B)"
-    elif speckle_level < 25.0:
-        density_str = "Heterogeneously Dense (ACR C)"
-    else:
-        density_str = "Extremely Dense (ACR D) - High speckle attenuation"
+    mask_parenchyma = np.zeros((h, w), dtype=np.uint8)
+    cv2.circle(mask_parenchyma, (lx, ly), max(10, int(r * 1.8)), 255, -1)
+    mask_parenchyma = cv2.subtract(mask_parenchyma, mask_lesion)
 
-    # Determine BI-RADS Category and Acoustic Shadowing
-    p_class = pred_class.lower()
-    if p_class == "malignant":
-        if confidence >= 0.94:
-            birads_str = "BI-RADS 5 - Highly suggestive of malignancy (≥95% risk; immediate biopsy required)"
-            shadowing_str = "Pronounced posterior acoustic shadowing surrounding irregular spiculated hypoechoic margin."
-        elif confidence >= 0.82:
-            birads_str = "BI-RADS 4C - High suspicion of malignancy (50-95% risk; urgent histological verification)"
-            shadowing_str = "Posterior acoustic shadowing detected surrounding localized lobulated mass margin."
-        elif confidence >= 0.65:
-            birads_str = "BI-RADS 4B - Moderate suspicion of malignancy (10-50% risk; core needle biopsy advised)"
-            shadowing_str = "Moderate posterior acoustic attenuation noted along microlobulated boundary."
-        else:
-            birads_str = "BI-RADS 4A - Low suspicion of malignancy (2-10% risk; tissue sampling/biopsy considered)"
-            shadowing_str = "Equivocal posterior acoustic shadowing with borderline margin irregularities."
-    elif p_class == "normal":
-        birads_str = "BI-RADS 1 - Negative (Normal screening presentation; regular annual follow-up)"
-        shadowing_str = "No focal hypoechoic mass, architectural distortion, or acoustic shadowing detected."
-    else: # benign
-        if confidence >= 0.94:
-            birads_str = "BI-RADS 1 - Negative / Normal screening presentation (No suspicious mass features)"
-            shadowing_str = "No focal abnormality or posterior acoustic shadowing observed."
-        elif confidence >= 0.82:
-            birads_str = "BI-RADS 2 - Benign finding (Routine screening; circumscribed homogeneous morphology)"
-            shadowing_str = "No posterior acoustic shadowing observed; clear through-transmission."
-        elif confidence >= 0.65:
-            birads_str = "BI-RADS 3 - Probably Benign (≤2% risk of malignancy; short-interval 6-month follow-up recommended)"
-            shadowing_str = "Minimal edge refile shadowing around circumscribed ovoid nodule; well-defined capsule."
-        else:
-            birads_str = "BI-RADS 4A - Low suspicion of malignancy (2-10% risk; equivocal boundary due to speckle distortion)"
-            shadowing_str = "Borderline margin definition with slight posterior acoustic heterogeneity."
+    lesion_mean = float(cv2.mean(gray_img, mask=mask_lesion)[0]) if np.sum(mask_lesion) > 0 else 60.0
+    parenchyma_mean = float(cv2.mean(gray_img, mask=mask_parenchyma)[0]) if np.sum(mask_parenchyma) > 0 else 120.0
 
-    rationale_str = (
-        f"Convolutional forward pass ({model_name.upper()}) identified localized structural morphology with "
-        f"{round(confidence * 100, 1)}% network confidence under {dominant_noise} acoustic profile. "
-        f"Stratified BI-RADS assignment reflects both prediction certainty and margin boundary definition."
-    )
+    hypoechoic_ratio = round(lesion_mean / max(1.0, parenchyma_mean), 2)
+    echogenicity_str = "Much darker than reference" if hypoechoic_ratio < 0.65 else ("Darker than reference" if hypoechoic_ratio < 0.90 else "Similar to reference")
+
+    # 2. Posterior Acoustic Shadowing Ratio (below lesion vs lateral tissue)
+    y_post_start = min(h - 1, ly + r)
+    y_post_end = min(h, ly + int(r * 2.5))
+    x_post_start = max(0, lx - r)
+    x_post_end = min(w, lx + r)
+
+    post_region = gray_img[y_post_start:y_post_end, x_post_start:x_post_end]
+    post_mean = float(np.mean(post_region)) if post_region.size > 0 else parenchyma_mean
+    shadow_ratio = round(post_mean / max(1.0, parenchyma_mean), 2)
+
+    posterior_str = "Lower mean than reference" if shadow_ratio < 0.75 else ("Higher mean than reference" if shadow_ratio > 1.25 else "Similar to reference")
+
+    # 3. Lesion Margin & Aspect Ratio
+    aspect_ratio = round(float(r * 2.0) / max(10.0, float(r * 1.8)), 2)
+    margin_type = "Irregularity proxy elevated" if hypoechoic_ratio < 0.60 or shadow_ratio < 0.70 else "Irregularity proxy not elevated"
+    orientation_str = "Height proxy exceeds width proxy" if aspect_ratio > 1.1 else "Width proxy equals or exceeds height proxy"
 
     return {
-        "birads": birads_str,
-        "tissue_density": density_str,
-        "acoustic_shadowing": shadowing_str,
+        "centroid": {"x": int(lx), "y": int(ly), "radius": int(r)},
+        "echogenicity": echogenicity_str,
+        "hypoechoic_ratio": hypoechoic_ratio,
+        "margin": margin_type,
+        "posterior_transmission": posterior_str,
+        "posterior_ratio": shadow_ratio,
+        "orientation": orientation_str,
+        "aspect_ratio": aspect_ratio
+    }
+
+
+def compute_research_report(pred_class: str, confidence: float, prob_dict: dict, noise_analysis: dict, model_name: str, morphology: Optional[dict] = None) -> dict:
+    """Return descriptive model output without diagnosis or clinical action."""
+    dominant_noise = noise_analysis.get("dominant_type", "speckle")
+    morph = morphology or {}
+    shadowing_str = morph.get("posterior_transmission", "Not estimated")
+    margin_str = morph.get("margin", "Not estimated")
+    echogenicity_str = morph.get("echogenicity", "Not estimated")
+    rationale_str = (f"{model_name.upper()} returned {pred_class.upper()} with a {confidence * 100:.1f}% softmax score "
+                     f"alongside the {dominant_noise.lower()} image-texture proxy. Descriptors are deterministic heuristics, not clinical findings.")
+
+    return {
+        "status": "Research output only",
+        "action": "No clinical action may be inferred.",
+        "posterior_intensity_heuristic": shadowing_str,
+        "edge_heuristic": margin_str,
+        "intensity_heuristic": echogenicity_str,
         "rationale": rationale_str
     }
 
@@ -473,32 +567,19 @@ async def predict_ultrasound(
 
     original_b64 = img_to_base64(img_np)
 
-    # Process image with CLAHE if requested
-    if use_clahe:
-        enhanced_np = apply_clahe(img_np)
-        input_for_model = enhanced_np
-    else:
-        input_for_model = img_np
-
-    # Apply Crop Strategy
-    if crop_strategy == "roi_crop":
-        input_for_model = crop_and_pad_roi(input_for_model)
-    elif crop_strategy == "direct_resize":
-        input_for_model = cv2.resize(input_for_model, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
-    elif crop_strategy == "center_crop":
-        h, w = input_for_model.shape[:2]
-        s = min(h, w)
-        cy, cx = h // 2, w // 2
-        crop = input_for_model[max(0, cy-s//2):min(h, cy+s//2), max(0, cx-s//2):min(w, cx+s//2)]
-        input_for_model = cv2.resize(crop, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
+    # Generate the contrast preview and use the same preprocessing function as evaluation.
+    enhanced_np = apply_clahe(img_np)
+    clahe_b64 = img_to_base64(enhanced_np)
+    input_for_model = preprocess_image(img_np, use_clahe, crop_strategy)
 
     # Prepare PyTorch Tensor
     img_pil = Image.fromarray(input_for_model)
     tensor = val_transform(img_pil).unsqueeze(0).to(config.DEVICE)
 
-    # Analyze Noise
+    # Analyze Noise & Morphological features
     img_gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if len(img_np.shape) == 3 else img_np
     noise_analysis = analyze_image_noise(img_gray)
+    morphology = compute_morphological_profile(img_gray)
 
     with torch.no_grad():
         outputs = active_model(tensor)
@@ -508,19 +589,29 @@ async def predict_ultrasound(
     confidence = float(probabilities[pred_idx].item())
     prob_dict = {config.CLASS_NAMES[i]: float(probabilities[i].item()) for i in range(config.NUM_CLASSES)}
 
-    # Draw localized ROI target circle on the processed visual image
+    # Compute Grad-CAM Saliency Heatmap
+    gradcam_cam = generate_gradcam(active_model, tensor, pred_idx, active_model_name)
+    gradcam_overlay_np = overlay_gradcam_on_image(input_for_model, gradcam_cam, alpha=0.55)
+    gradcam_b64 = img_to_base64(gradcam_overlay_np)
+
+    # Draw visual scan
     visual_img = draw_lesion_circle(input_for_model, pred_class)
     processed_b64 = img_to_base64(visual_img)
 
-    # Determine Ground Truth Label from Filename or Parameter
+    research_report = compute_research_report(
+        pred_class=pred_class,
+        confidence=confidence,
+        prob_dict=prob_dict,
+        noise_analysis=noise_analysis,
+        model_name=active_model_name,
+        morphology=morphology
+    )
+
+    # Determine Ground Truth Label
     filename = file.filename or "uploaded_scan.png"
     gt_label = "UNKNOWN"
     if ground_truth and ground_truth.upper() in ["BENIGN", "MALIGNANT"]:
         gt_label = ground_truth.upper()
-    elif "benign" in filename.lower():
-        gt_label = "BENIGN"
-    elif "malignant" in filename.lower() or "sample_0" in filename.lower():
-        gt_label = "MALIGNANT"
 
     return {
         "filename": filename,
@@ -531,27 +622,169 @@ async def predict_ultrasound(
         "original_image": original_b64,
         "processed_image": processed_b64,
         "spotlight_zoom_base64": processed_b64,
+        "gradcam_image": gradcam_b64,
+        "clahe_image": clahe_b64,
         "used_clahe": use_clahe,
+        "crop_strategy": crop_strategy,
         "noise_analysis": noise_analysis,
+        "morphology": morphology,
+        "research_report": research_report,
         "model_name": active_model_name,
         "research_notice": "Experimental research output only. It is not a diagnosis or clinical decision-support result."
     }
 
-@app.post("/predict/batch")
-async def predict_ultrasound_batch(
-    files: List[UploadFile] = File(...),
-    use_clahe: bool = Form(True)
+@app.post("/predict/compare")
+async def compare_all_models(
+    file: UploadFile = File(...),
+    use_clahe: bool = Form(True),
+    crop_strategy: Optional[str] = Form("roi_crop")
 ):
-    global model, val_transform
+    """
+    Runs concurrent comparative inference across all available deep learning architectures:
+    ResNet-50, EfficientNet-B0, and Custom Ultrasound CNN.
+    Returns individual predictions, confidences, probability vectors, and consensus metric.
+    """
+    global val_transform
     try:
         load_model_if_needed()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model not loaded.")
+
+    try:
+        contents = await file.read()
+        validate_upload(file, contents)
+        nparr = np.frombuffer(contents, np.uint8)
+        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img_bgr is None:
+            img_pil = Image.open(io.BytesIO(contents)).convert("RGB")
+            img_np = np.array(img_pil)
+        else:
+            img_np = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid image: {str(e)}")
+
+    validation_error = validate_ultrasound_candidate(img_np)
+    if validation_error:
+        raise HTTPException(status_code=400, detail=validation_error)
+
+    input_for_model = preprocess_image(img_np, use_clahe, crop_strategy)
+
+    img_pil = Image.fromarray(input_for_model)
+    tensor = val_transform(img_pil).unsqueeze(0).to(config.DEVICE)
+
+    model_candidates = ["resnet50", "efficientnet_b0", "custom_cnn"]
+    comparisons = {}
+    predictions_list = []
+
+    for m_name in model_candidates:
+        try:
+            m_instance, actual_name = get_verified_model(m_name)
+            with torch.no_grad():
+                out = m_instance(tensor)
+                probs = torch.softmax(out, dim=1).squeeze(0)
+                pred_idx = int(torch.argmax(probs).item())
+                pred_class = config.CLASS_NAMES[pred_idx]
+                conf = float(probs[pred_idx].item())
+                prob_dict = {config.CLASS_NAMES[i]: round(float(probs[i].item()) * 100, 2) for i in range(config.NUM_CLASSES)}
+
+            # Also generate a Grad-CAM preview for each model
+            cam = generate_gradcam(m_instance, tensor, pred_idx, actual_name)
+            cam_overlay = overlay_gradcam_on_image(input_for_model, cam, alpha=0.5)
+            cam_b64 = img_to_base64(cam_overlay)
+
+            comparisons[m_name] = {
+                "model_name": actual_name,
+                "prediction": pred_class.upper(),
+                "confidence": round(conf * 100, 2),
+                "probabilities": prob_dict,
+                "gradcam_image": cam_b64
+            }
+            predictions_list.append(pred_class.upper())
+        except Exception as exc:
+            comparisons[m_name] = {
+                "model_name": m_name,
+                "error": str(exc)
+            }
+
+    # Consensus calculation
+    valid_preds = [p for p in predictions_list if p]
+    if valid_preds:
+        majority_class = max(set(valid_preds), key=valid_preds.count)
+        agreement_ratio = round(valid_preds.count(majority_class) / len(valid_preds) * 100, 1)
+        consensus_status = "Unanimous Agreement (3/3)" if agreement_ratio == 100.0 else (
+            f"Majority Consensus ({valid_preds.count(majority_class)}/{len(valid_preds)})" if agreement_ratio >= 66.0 else "Model Disagreement / Split Verdict"
+        )
+    else:
+        majority_class = "UNKNOWN"
+        agreement_ratio = 0.0
+        consensus_status = "Inconclusive"
+
+    return {
+        "filename": file.filename or "scan.png",
+        "consensus_prediction": majority_class,
+        "agreement_ratio": agreement_ratio,
+        "consensus_status": consensus_status,
+        "models": comparisons
+    }
+
+@app.get("/api/benchmarks")
+def get_dissertation_benchmarks():
+    """
+    Return only metrics emitted by a real evaluation run.
+    """
+    metrics_path = os.path.join(config.OUTPUT_DIR, "metrics.json")
+    if not os.path.exists(metrics_path):
+        raise HTTPException(status_code=404, detail="No evaluated metrics are available. Run evaluate.py first.")
+    with open(metrics_path, "r", encoding="utf-8") as f:
+        metrics = json.load(f)
+    return {
+        "status": "single evaluation run; do not treat as clinical validation",
+        "metrics": metrics,
+        "unavailable": ["pseudo-label ablation", "multi-model comparison", "noise benchmark"],
+    }
+
+
+@app.get("/api/data-audit")
+def get_data_audit():
+    """Return the most recent read-only data-integrity audit."""
+    path = os.path.join(config.OUTPUT_DIR, "data_audit.json")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="No data audit is available. Run scripts/audit_data.py first.")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@app.get("/api/evidence/{filename}")
+def get_evidence_file(filename: str):
+    """Serve only generated, non-sensitive evaluation summaries and figures."""
+    allowed = {"metrics.json", "data_audit.json", "confusion_matrix.png", "roc_curve.png"}
+    if filename not in allowed:
+        raise HTTPException(status_code=404, detail="Evidence file not found.")
+    path = os.path.join(config.OUTPUT_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Evidence file not found.")
+    return FileResponse(path)
+
+
+@app.post("/predict/batch")
+async def predict_ultrasound_batch(
+    files: List[UploadFile] = File(...),
+    use_clahe: bool = Form(True),
+    crop_strategy: Optional[str] = Form("roi_crop"),
+    model_name: Optional[str] = Form("efficientnet_b0")
+):
+    global val_transform
+    try:
+        load_model_if_needed()
+        active_model, active_model_name = get_verified_model(model_name)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     results = []
     for file in files:
+        fname = file.filename or "scan.png"
         try:
             contents = await file.read()
             validate_upload(file, contents)
@@ -563,67 +796,99 @@ async def predict_ultrasound_batch(
             else:
                 img_np = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         except HTTPException as exc:
-            results.append({"filename": file.filename, "error": exc.detail})
+            results.append({"filename": fname, "error": exc.detail, "status": "error"})
             continue
         except Exception as e:
-            results.append({
-                "filename": file.filename,
-                "error": f"Invalid image file: {str(e)}"
-            })
+            results.append({"filename": fname, "error": f"Invalid image file: {str(e)}", "status": "error"})
             continue
 
         validation_error = validate_ultrasound_candidate(img_np)
         if validation_error:
             results.append({
-                "filename": file.filename,
-                "error": validation_error
+                "filename": fname,
+                "error": validation_error,
+                "status": "rejected"
             })
             continue
 
         original_b64 = img_to_base64(img_np)
 
-        if use_clahe:
-            enhanced_np = apply_clahe(img_np)
-            processed_b64 = img_to_base64(enhanced_np)
-            input_for_model = enhanced_np
-        else:
-            processed_b64 = original_b64
-            input_for_model = img_np
+        input_for_model = preprocess_image(img_np, use_clahe, crop_strategy)
 
         img_pil = Image.fromarray(input_for_model)
         tensor = val_transform(img_pil).unsqueeze(0).to(config.DEVICE)
 
+        img_gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if len(img_np.shape) == 3 else img_np
+        noise_analysis = analyze_image_noise(img_gray)
+        morphology = compute_morphological_profile(img_gray)
+
         with torch.no_grad():
-            outputs = model(tensor)
+            outputs = active_model(tensor)
             probs = torch.softmax(outputs, dim=1).squeeze(0)
             pred_idx = torch.argmax(probs).item()
             pred_class = config.CLASS_NAMES[pred_idx]
-            confidence = probs[pred_idx].item()
+            confidence = float(probs[pred_idx].item())
 
-        prob_dict = {config.CLASS_NAMES[i]: float(probs[i].item()) for i in range(config.NUM_CLASSES)}
+        prob_dict = {config.CLASS_NAMES[i]: round(float(probs[i].item()) * 100, 2) for i in range(config.NUM_CLASSES)}
 
-        # Draw localized ROI target circle
+        # Grad-CAM heatmap
+        cam = generate_gradcam(active_model, tensor, pred_idx, active_model_name)
+        cam_overlay = overlay_gradcam_on_image(input_for_model, cam, alpha=0.55)
+        gradcam_b64 = img_to_base64(cam_overlay)
+
+        # Visual ROI processed
         visual_img = draw_lesion_circle(input_for_model, pred_class)
         processed_b64 = img_to_base64(visual_img)
 
-        # Analyze Noise
-        img_gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY) if len(img_np.shape) == 3 else img_np
-        noise_analysis = analyze_image_noise(img_gray)
+        output_band = "HIGH_SCORE" if confidence >= 0.80 else ("MODERATE_SCORE" if confidence >= 0.60 else "LOW_SCORE")
+
+        research_report = compute_research_report(
+            pred_class=pred_class,
+            confidence=confidence,
+            prob_dict=prob_dict,
+            noise_analysis=noise_analysis,
+            model_name=active_model_name,
+            morphology=morphology
+        )
 
         results.append({
-            "filename": file.filename,
+            "filename": fname,
+            "status": "success",
             "prediction": pred_class.upper(),
+            "output_band": output_band,
             "confidence": round(confidence * 100, 2),
-            "probabilities": {k: round(v * 100, 2) for k, v in prob_dict.items()},
+            "probabilities": prob_dict,
             "original_image": original_b64,
             "processed_image": processed_b64,
-            "spotlight_zoom_base64": processed_b64,
-            "noise_analysis": noise_analysis,
-            "model_name": loaded_model_name,
-            "research_notice": "Experimental research output only. It is not a diagnosis or clinical decision-support result."
+            "gradcam_image": gradcam_b64,
+            "noise_type": noise_analysis.get("dominant_type", "Standard"),
+            "snr_db": noise_analysis.get("metrics", {}).get("snr_db", 0.0),
+            "report_status": research_report.get("status", "Research output only"),
+            "research_notice": research_report.get("action", "No clinical action may be inferred."),
+            "model_name": active_model_name
         })
 
-    return {"results": results}
+    # Cohort summary statistics
+    total = len(results)
+    successes = [r for r in results if r.get("status") == "success"]
+    malignant_count = sum(1 for r in successes if r.get("prediction") == "MALIGNANT")
+    benign_count = sum(1 for r in successes if r.get("prediction") == "BENIGN")
+    normal_count = sum(1 for r in successes if r.get("prediction") == "NORMAL")
+    avg_conf = round(sum(r.get("confidence", 0) for r in successes) / max(1, len(successes)), 2)
+
+    return {
+        "cohort_summary": {
+            "total_scans": total,
+            "processed_scans": len(successes),
+            "malignant_count": malignant_count,
+            "benign_count": benign_count,
+            "normal_count": normal_count,
+            "average_confidence": avg_conf,
+            "active_model": active_model_name,
+            "research_notice": "Provisional model outputs only; no clinical prioritisation is performed."
+        },
+        "results": results
+    }
 
 # Mount static frontend directory
 WEB_DIR = config.WEB_DIR
@@ -672,7 +937,7 @@ def get_dataset_files(dataset: str = "busi", split: str = "val"):
             for fname in sorted(os.listdir(class_dir)):
                 # Filter out masks (files ending with _tumor.png, _other.png etc.)
                 if fname.lower().endswith(('.png', '.jpg', '.jpeg', '.tif')):
-                    if not fname.lower().endswith(('_tumor.png', '_mask.png')):
+                    if not fname.lower().endswith(('_tumor.png', '_mask.png', '_lesion_mask.png')):
                         files_list.append({
                             "name": fname,
                             "class": class_name,
@@ -698,6 +963,101 @@ def get_split_dataset_file(split: str, category: str, filename: str, dataset: st
     return FileResponse(file_path)
 
 
+def compute_psnr(img1: np.ndarray, img2: np.ndarray) -> float:
+    """Calculates Peak Signal-to-Noise Ratio (PSNR) in decibels (dB)."""
+    if img1.shape != img2.shape:
+        img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+    mse = np.mean((img1.astype(np.float64) - img2.astype(np.float64)) ** 2)
+    if mse == 0:
+        return 99.0
+    PIXEL_MAX = 255.0
+    return round(float(20 * np.log10(PIXEL_MAX / np.sqrt(mse))), 2)
+
+
+def compute_ssim(img1: np.ndarray, img2: np.ndarray) -> float:
+    """Calculates Structural Similarity Index (SSIM) between two ultrasound images."""
+    if img1.shape != img2.shape:
+        img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+    if len(img1.shape) == 3:
+        img1_g = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
+        img2_g = cv2.cvtColor(img2, cv2.COLOR_RGB2GRAY)
+    else:
+        img1_g, img2_g = img1, img2
+
+    C1 = (0.01 * 255) ** 2
+    C2 = (0.03 * 255) ** 2
+
+    img1_f = img1_g.astype(np.float64)
+    img2_f = img2_g.astype(np.float64)
+
+    mu1 = cv2.GaussianBlur(img1_f, (11, 11), 1.5)
+    mu2 = cv2.GaussianBlur(img2_f, (11, 11), 1.5)
+
+    mu1_sq = mu1 ** 2
+    mu2_sq = mu2 ** 2
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = cv2.GaussianBlur(img1_f ** 2, (11, 11), 1.5) - mu1_sq
+    sigma2_sq = cv2.GaussianBlur(img2_f ** 2, (11, 11), 1.5) - mu2_sq
+    sigma12 = cv2.GaussianBlur(img1_f * img2_f, (11, 11), 1.5) - mu1_mu2
+
+    ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
+    return round(float(np.clip(np.mean(ssim_map), 0.0, 1.0)), 4)
+
+
+@app.get("/api/dataset/cohort")
+def get_balanced_cohort(dataset: str = "busi", split: str = "val", count: int = 16):
+    """
+    Return an interleaved labelled cohort for local engineering checks.
+
+    The endpoint reflects the current folder labels and does not certify that the
+    split is subject independent.
+    """
+    if dataset not in ["busi", "breast", "oasbud"]:
+        dataset = "busi"
+    if split not in ["val", "test", "train"]:
+        split = "val"
+
+    split_dir = os.path.join(config.DATA_DIR, dataset, split)
+    half = max(1, count // 2)
+
+    benign_files = []
+    b_dir = os.path.join(split_dir, "benign")
+    if os.path.exists(b_dir):
+        for f in sorted(os.listdir(b_dir)):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif')) and not f.lower().endswith(('_mask.png', '_tumor.png', '_lesion_mask.png')):
+                benign_files.append({
+                    "name": f,
+                    "class": "benign",
+                    "ground_truth": "BENIGN",
+                    "url": f"/api/dataset/file/{split}/benign/{f}?dataset={dataset}"
+                })
+
+    malignant_files = []
+    m_dir = os.path.join(split_dir, "malignant")
+    if os.path.exists(m_dir):
+        for f in sorted(os.listdir(m_dir)):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif')) and not f.lower().endswith(('_mask.png', '_tumor.png', '_lesion_mask.png')):
+                malignant_files.append({
+                    "name": f,
+                    "class": "malignant",
+                    "ground_truth": "MALIGNANT",
+                    "url": f"/api/dataset/file/{split}/malignant/{f}?dataset={dataset}"
+                })
+
+    selected = []
+    m_sub = malignant_files[:half]
+    b_sub = benign_files[:half]
+    max_len = max(len(m_sub), len(b_sub))
+    for i in range(max_len):
+        if i < len(m_sub):
+            selected.append(m_sub[i])
+        if i < len(b_sub):
+            selected.append(b_sub[i])
+
+    return selected
+
+
 def add_synthetic_noise(img_np: np.ndarray, noise_type: str, intensity: float, seed: int) -> np.ndarray:
     """
     Applies synthetic noise to an image for comparison studies.
@@ -706,7 +1066,6 @@ def add_synthetic_noise(img_np: np.ndarray, noise_type: str, intensity: float, s
     rng = np.random.default_rng(seed)
     
     if noise_type == "speckle":
-        # Rayleigh-distributed multiplicative envelope, normalized to preserve mean intensity.
         noise = rng.rayleigh(scale=1.0, size=(h, w))
         noise = noise / np.mean(noise)
         noise = 1.0 + intensity * 3.5 * (noise - 1.0)
@@ -717,7 +1076,6 @@ def add_synthetic_noise(img_np: np.ndarray, noise_type: str, intensity: float, s
             noisy = img_np.astype(np.float32) * noise
             
     elif noise_type == "gaussian":
-        # Additive electronic/sensor noise: I = I + N(0, v)
         noise = rng.normal(0, intensity * 80.0, (h, w))
         if len(img_np.shape) == 3:
             noise = np.expand_dims(noise, axis=2)
@@ -726,7 +1084,6 @@ def add_synthetic_noise(img_np: np.ndarray, noise_type: str, intensity: float, s
             noisy = img_np.astype(np.float32) + noise
             
     elif noise_type == "impulse":
-        # Salt & Pepper pixel dropout noise
         noisy = img_np.copy()
         num_salt = np.ceil(intensity * 0.08 * img_np.shape[0] * img_np.shape[1])
         coords_y = rng.integers(0, h, int(num_salt))
@@ -753,20 +1110,9 @@ def add_synthetic_noise(img_np: np.ndarray, noise_type: str, intensity: float, s
     return noisy
 
 
-def apply_strategy_transform(image_np: np.ndarray, strategy: str, use_clahe: bool, active_model: torch.nn.Module) -> Tuple[str, float, str]:
+def apply_strategy_transform(image_np: np.ndarray, strategy: str, use_clahe: bool, active_model: torch.nn.Module) -> Tuple[str, float, str, np.ndarray]:
     strategy = (strategy or "direct_resize").lower()
-    
-    source_np = apply_clahe(image_np) if use_clahe else image_np
-    if strategy == "roi_crop":
-        processed_np = crop_and_pad_roi(source_np)
-    elif strategy == "center_crop":
-        h, w = source_np.shape[:2]
-        s = min(h, w)
-        cy, cx = h // 2, w // 2
-        crop = source_np[max(0, cy-s//2):min(h, cy+s//2), max(0, cx-s//2):min(w, cx+s//2)]
-        processed_np = cv2.resize(crop, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
-    else: # direct_resize
-        processed_np = cv2.resize(source_np, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
+    processed_np = preprocess_image(image_np, use_clahe, strategy)
         
     tensor = val_transform(Image.fromarray(processed_np)).unsqueeze(0).to(config.DEVICE)
     with torch.no_grad():
@@ -777,7 +1123,7 @@ def apply_strategy_transform(image_np: np.ndarray, strategy: str, use_clahe: boo
         conf = probs[pred_idx].item() * 100
         
     visual = draw_lesion_circle(processed_np, pred_class)
-    return pred_class, round(conf, 2), img_to_base64(visual)
+    return pred_class, round(conf, 2), img_to_base64(visual), processed_np
 
 
 @app.post("/api/noise/simulate")
@@ -818,47 +1164,68 @@ async def simulate_noise_and_predict(
     if validation_error:
         raise HTTPException(status_code=400, detail=validation_error)
 
-    # The same deterministic noise realization flows through stages 2–4.
+    # 4-Stage controlled pipeline
     noisy_raw = add_synthetic_noise(img_np, noise_type, intensity, seed)
-    pred_class_clean, conf_clean, clean_b64 = apply_strategy_transform(img_np, "direct_resize", use_clahe, active_model)
-    pred_class_noisy_u, conf_noisy_u, noisy_u_b64 = apply_strategy_transform(noisy_raw, "direct_resize", use_clahe, active_model)
-    pred_c3, conf_c3, img_c3_b64 = apply_strategy_transform(noisy_raw, col3_strategy, use_clahe, active_model)
-    pred_c4, conf_c4, img_c4_b64 = apply_strategy_transform(noisy_raw, "roi_crop", use_clahe, active_model)
+    pred_class_clean, conf_clean, clean_b64, tensor_clean = apply_strategy_transform(img_np, "direct_resize", use_clahe, active_model)
+    pred_class_noisy_u, conf_noisy_u, noisy_u_b64, tensor_noisy = apply_strategy_transform(noisy_raw, "direct_resize", use_clahe, active_model)
+    pred_c3, conf_c3, img_c3_b64, tensor_c3 = apply_strategy_transform(noisy_raw, col3_strategy, use_clahe, active_model)
+    pred_c4, conf_c4, img_c4_b64, tensor_c4 = apply_strategy_transform(noisy_raw, "roi_crop", use_clahe, active_model)
+
+    # Compute PSNR & SSIM metrics across stages
+    psnr_noisy = compute_psnr(img_np, noisy_raw)
+    ssim_noisy = compute_ssim(img_np, noisy_raw)
+    psnr_sol_a = compute_psnr(tensor_clean, tensor_c3)
+    ssim_sol_a = compute_ssim(tensor_clean, tensor_c3)
+    psnr_sol_b = compute_psnr(tensor_clean, tensor_c4)
+    ssim_sol_b = compute_ssim(tensor_clean, tensor_c4)
 
     explanations = {
-        "speckle": "Speckle noise is a multiplicative acoustic artifact inherent to ultrasound. It degrades the CNN's ability to segment fine-grained lesion margins, often blurring irregular spiculated borders and leading to incorrect classification.",
-        "gaussian": "Gaussian noise simulates electronic thermal sensor noise. High thermal noise introduces high-frequency random fluctuations, corrupting feature activations and lowering prediction confidence.",
-        "impulse": "Impulse (salt & pepper) noise represents transmission dropout errors. It creates isolated pure white/black pixels, which can trigger artificial high-frequency edge detections."
+        "speckle": "Seeded multiplicative noise is used here as an algorithmic stressor. It is not a faithful model of a scanner, acquisition protocol, or clinical site.",
+        "gaussian": "Seeded additive Gaussian noise is used here as an algorithmic stressor. A single image cannot establish model robustness.",
+        "impulse": "Seeded impulse noise introduces artificial extreme pixels for a controlled software check; it does not reproduce a specific acquisition artifact."
     }
-    explanation = explanations.get(noise_type, "Noise degrades visual contrast, impairing diagnostic feature extraction.")
+    explanation = explanations.get(noise_type, "Noise changes image contrast and may alter extracted model features.")
 
     return {
         "stage1_clean": {
             "prediction": pred_class_clean,
             "confidence": round(conf_clean, 2),
-            "image": clean_b64
+            "image": clean_b64,
+            "psnr_db": None,
+            "ssim": 1.0000
         },
         "stage2_noisy": {
             "prediction": pred_class_noisy_u,
             "confidence": round(conf_noisy_u, 2),
-            "image": noisy_u_b64
+            "image": noisy_u_b64,
+            "psnr_db": psnr_noisy,
+            "ssim": ssim_noisy
         },
         "stage3_direct": {
             "prediction": pred_c3,
             "confidence": conf_c3,
             "image": img_c3_b64,
-            "strategy": col3_strategy
+            "strategy": col3_strategy,
+            "psnr_db": psnr_sol_a,
+            "ssim": ssim_sol_a
         },
         "stage4_roi": {
             "prediction": pred_c4,
             "confidence": conf_c4,
             "image": img_c4_b64,
-            "strategy": "roi_crop"
+            "strategy": "roi_crop",
+            "psnr_db": psnr_sol_b,
+            "ssim": ssim_sol_b
         },
         "explanation": explanation,
         "model_name": active_model_name,
         "seed": seed,
-        "deltas": {"noise_vs_clean": round(conf_noisy_u - conf_clean, 2), "method_a_vs_noise": round(conf_c3 - conf_noisy_u, 2), "proposed_vs_noise": round(conf_c4 - conf_noisy_u, 2)}
+        "deltas": {
+            "noise_vs_clean": round(conf_noisy_u - conf_clean, 2),
+            "method_a_vs_noise": round(conf_c3 - conf_noisy_u, 2),
+            "proposed_vs_noise": round(conf_c4 - conf_noisy_u, 2),
+            "ssim_gain": round(ssim_sol_b - ssim_sol_a, 4)
+        }
     }
 
 

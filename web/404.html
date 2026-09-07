@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 Path Not Found | OncoVision AI</title>
+    <title>Page not found | Ultrasound Research Workspace</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #030303;
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-primary: #00e5ff;
-            --accent-secondary: #8b5cf6;
-            --error-color: #ff1744;
-            --error-glow: rgba(255, 23, 68, 0.2);
-            --border-color: rgba(255, 255, 255, 0.05);
+            --paper: #f6f4ee;
+            --surface: #fffdf8;
+            --ink: #10243f;
+            --muted: #617083;
+            --teal: #087f75;
+            --teal-dark: #075f59;
+            --line: #d9d5ca;
         }
 
         * {
@@ -27,115 +26,86 @@
 
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-primary);
-            height: 100vh;
+            background: var(--paper);
+            color: var(--ink);
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            position: relative;
-        }
-
-        /* Subtle dark background radial glow */
-        .background-glow {
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            border-radius: 50%;
-            background: radial-gradient(circle, #f43f5e 0%, transparent 70%);
-            filter: blur(140px);
-            z-index: -1;
-            opacity: 0.12;
-            pointer-events: none;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            padding: 24px;
         }
 
         .container {
-            max-width: 480px;
-            width: 90%;
-            text-align: center;
-            background: rgba(10, 10, 10, 0.8);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 40px 30px;
-            backdrop-filter: blur(24px);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
-            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            max-width: 620px;
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            padding: clamp(32px, 7vw, 72px);
+            box-shadow: 0 20px 60px rgba(16, 36, 63, 0.08);
         }
 
         .error-code {
             font-family: 'Space Grotesk', monospace;
-            font-size: 5rem;
+            font-size: clamp(4.5rem, 15vw, 8rem);
             font-weight: 700;
-            color: var(--error-color);
-            text-shadow: 0 0 30px var(--error-glow);
-            line-height: 1;
-            margin-bottom: 10px;
-            letter-spacing: -2px;
+            color: var(--teal);
+            line-height: 0.85;
+            margin-bottom: 28px;
+            letter-spacing: -0.07em;
         }
 
         .status-badge {
             display: inline-block;
-            background: rgba(244, 63, 94, 0.1);
-            border: 1px solid rgba(244, 63, 94, 0.2);
-            color: var(--error-color);
-            padding: 4px 12px;
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+            color: var(--muted);
+            padding: 9px 0;
             font-size: 0.72rem;
             font-weight: 600;
             text-transform: uppercase;
-            border-radius: 20px;
             margin-bottom: 24px;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.12em;
         }
 
         h1 {
-            font-size: 1.5rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(1.65rem, 5vw, 2.35rem);
             font-weight: 700;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
+            margin-bottom: 14px;
+            letter-spacing: -0.04em;
         }
 
         p {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-            margin-bottom: 30px;
+            font-size: 1rem;
+            color: var(--muted);
+            line-height: 1.65;
+            margin-bottom: 32px;
         }
 
         .btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
-            border: none;
+            background: var(--teal);
+            border: 1px solid var(--teal);
             color: white;
             padding: 12px 24px;
-            border-radius: 8px;
+            border-radius: 4px;
             font-size: 0.88rem;
             font-weight: 600;
             text-decoration: none;
             cursor: pointer;
-            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 12px rgba(0, 229, 255, 0.15);
+            transition: background 160ms ease, transform 160ms ease;
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(0, 229, 255, 0.3);
+            background: var(--teal-dark);
+        }
+
+        .btn:focus-visible {
+            outline: 3px solid rgba(8, 127, 117, 0.25);
+            outline-offset: 3px;
         }
 
         .btn svg {
@@ -148,17 +118,16 @@
     </style>
 </head>
 <body>
-    <div class="background-glow"></div>
     <div class="container">
         <div class="error-code">404</div>
-        <span class="status-badge">Path Not Found</span>
-        <h1>Radiological Path Missing</h1>
-        <p>The requested clinical resource, patient directory, or API route does not exist on this diagnostic server. Please verify your URL path.</p>
+        <span class="status-badge">Research workspace · path not found</span>
+        <h1>This page is outside the study route.</h1>
+        <p>The requested page or research API route does not exist. Return to the workspace to inspect the model, dataset audit, and provisional evaluation record.</p>
         <a href="/" class="btn">
             <svg viewBox="0 0 24 24">
                 <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
-            Return to Control Panel
+            Return to workspace
         </a>
     </div>
 </body>

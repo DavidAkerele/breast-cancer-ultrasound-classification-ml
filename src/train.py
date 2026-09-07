@@ -1,6 +1,12 @@
 import os
 import argparse
+import json
+import random
 import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,6 +20,31 @@ except ImportError:
     import config
     from dataset import get_dataloaders
     from models import get_model
+
+from scripts.audit_data import build_report
+
+
+def set_reproducible_seed(seed):
+    """Seed the libraries used by this training loop."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def audit_training_data(allow_unaudited):
+    """Write the split audit and refuse training unless the risk is explicit."""
+    report = build_report(Path(config.DATA_DIR))
+    audit_path = Path(config.OUTPUT_DIR) / "data_audit.json"
+    audit_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if not report["audit_passed"] and not allow_unaudited:
+        failed = ", ".join(report["failed_datasets"])
+        raise RuntimeError(
+            f"Data audit failed for: {failed}. Rebuild subject-level splits, or pass "
+            "--allow-unaudited-data only for an explicitly provisional engineering run."
+        )
+    return report
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
     model.train()
@@ -73,7 +104,16 @@ def main():
     parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="Learning rate")
     parser.add_argument("--combine", action=argparse.BooleanOptionalAction, default=True,
                         help="Combine multiple datasets for training (use --no-combine for the active dataset only)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed recorded in the checkpoint")
+    parser.add_argument(
+        "--allow-unaudited-data",
+        action="store_true",
+        help="Permit a provisional run after a failed subject-level split audit",
+    )
     args = parser.parse_args()
+
+    set_reproducible_seed(args.seed)
+    audit_report = audit_training_data(args.allow_unaudited_data)
 
     print(f"--- Starting Training Pipeline on Device: {config.DEVICE} ---")
     
@@ -126,7 +166,18 @@ def main():
                 'val_loss': val_loss,
                 'val_acc': val_acc,
                 'model_name': args.model,
-                'class_names': config.CLASS_NAMES
+                'class_names': config.CLASS_NAMES,
+                'training_config': {
+                    'seed': args.seed,
+                    'batch_size': args.batch_size,
+                    'learning_rate': args.lr,
+                    'epochs_requested': args.epochs,
+                    'combined_datasets': args.combine,
+                    'crop_strategy': config.CROP_STRATEGY,
+                    'use_clahe': config.USE_CLAHE,
+                    'created_at_utc': datetime.now(timezone.utc).isoformat(),
+                },
+                'data_audit_passed': audit_report['audit_passed'],
             }
             torch.save(checkpoint_data, config.CHECKPOINT_PATH)
             if args.model in config.MODEL_CHECKPOINT_PATHS:

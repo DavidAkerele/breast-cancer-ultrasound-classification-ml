@@ -1,255 +1,82 @@
 \chapter{Background and Literature Review}
 \label{ch:background}
 
-\section{Introduction}
-Computer-aided diagnosis (CAD) systems powered by machine learning and deep convolutional neural networks have transitioned from experimental prototypes to indispensable clinical decision support systems \citep{Litjens2017, Topol2019}. In breast cancer screening, medical ultrasound imaging serves as a non-invasive, cost-effective, and radiation-free modality crucial for differentiating benign masses from malignant carcinomas \citep{AlDhabyani2020}. However, the diagnostic reliability and latent feature stability of deep neural networks remain inherently vulnerable to acoustic degradation phenomena and spatial preprocessing distortions \citep{Jiang2023}. 
-
-To design genuinely noise-resilient and clinically safe automated classification systems, it is essential to understand the biophysical mechanics governing acoustic wave propagation, the mathematical physics of multiplicative speckle noise, the clinical ACR BI-RADS diagnostic lexicon, and the architectural principles of convolutional neural networks. This chapter provides a rigorous theoretical synthesis of these foundational domains, reviews prior literature, and identifies the key research gaps addressed by this dissertation.
-
-\section{Ultrasound Biophysics and Acoustic Wave Mechanics}
-Medical ultrasound imaging relies on the transmission, reflection, scattering, and attenuation of high-frequency mechanical longitudinal pressure waves propagating through biological tissue media \citep{Sikhakhane2024}. Clinical transducers operate across frequencies ranging from $2\text{ MHz}$ to $20\text{ MHz}$ ($7\text{ MHz} - 15\text{ MHz}$ for high-resolution superficial breast imaging). 
-
-\subsection{Acoustic Wave Equation and Wave Velocity}
-The propagation of small-amplitude acoustic pressure waves through a continuous, non-viscous biological medium is governed by the classical linear wave equation:
+\section{Breast ultrasound as an imaging modality}
+Ultrasound forms images from the transmission and reception of acoustic waves. At a simplified level, the speed of a small-amplitude pressure wave in a medium is related to its bulk modulus $K$ and density $\rho$ by
 \begin{equation}
-\nabla^2 p(\mathbf{r}, t) - \frac{1}{c^2} \frac{\partial^2 p(\mathbf{r}, t)}{\partial t^2} = 0
-\label{eq:wave_equation}
+c = \sqrt{\frac{K}{\rho}}.
 \end{equation}
-where $p(\mathbf{r}, t)$ denotes the acoustic pressure field at spatial coordinate $\mathbf{r} = (x, y, z)$ and time $t$, and $c$ represents the acoustic propagation velocity within the tissue. In human soft tissue, the average speed of sound is standardized to $c \approx 1540\text{ m/s}$, determined by the tissue's volumetric bulk modulus $K$ and ambient density $\rho_0$:
+At an interface between tissues with acoustic impedances $Z_1$ and $Z_2$, the normal-incidence intensity reflection coefficient can be written as
 \begin{equation}
-c = \sqrt{\frac{K}{\rho_0}}
-\label{eq:speed_of_sound}
+R_I = \left(\frac{Z_2-Z_1}{Z_2+Z_1}\right)^2.
 \end{equation}
+Spatially varying reflection, scattering, attenuation, time-gain compensation, and scanner processing jointly determine the displayed B-mode image. The resulting pixel array is therefore not a direct tissue measurement and can vary substantially between acquisitions.
 
-\subsection{Acoustic Impedance and Boundary Reflection}
-As an ultrasound wave travels through anatomical structures, it encounters interfaces between heterogeneous tissue layers (e.g., adipose tissue, glandular parenchyma, fibrous stroma, or solid neoplastic masses). The characteristic acoustic impedance $Z$ of a biological medium quantifies its resistance to acoustic wave transmission:
+Breast ultrasound is used alongside clinical history and other imaging. Radiologists may consider features such as shape, margin, orientation, echogenicity, and posterior acoustic behaviour within the ACR BI-RADS ultrasound lexicon \citep{Mendelson2013,Stavros1995}. These descriptors provide clinical context for why geometry and local contrast matter. They do not justify inferring a BI-RADS category from this project's classifier or from its heuristic image measurements.
+
+\section{Speckle and image variability}
+Speckle arises from constructive and destructive interference among echoes from unresolved scatterers. A frequently used simplified observation model combines signal-dependent and additive components:
 \begin{equation}
-Z = \rho_0 \cdot c
-\label{eq:acoustic_impedance}
+I(x,y)=f(x,y)\,\eta_m(x,y)+\eta_a(x,y),
+\label{eq:speckle_model}
 \end{equation}
+where $f$ is an underlying reflectivity field, $\eta_m$ is a multiplicative term, and $\eta_a$ represents additive acquisition noise. This model is an approximation: displayed clinical images also contain beamforming, compression, filtering, and device-specific processing.
 
-When an acoustic wave travelling through medium 1 (impedance $Z_1$) strikes an orthogonal boundary with medium 2 (impedance $Z_2$), acoustic energy partitions into a reflected wave and a transmitted wave. The acoustic pressure reflection coefficient $R_p$ and intensity reflection coefficient $R_I$ are expressed as:
+Traditional reduction methods include local-statistics filters and speckle-reducing anisotropic diffusion \citep{Lee1980,Yu2002}. More recent work evaluates learned models under perturbations to determine whether apparently strong classifiers remain stable when image quality changes \citep{Jiang2023}. Robustness must be tested on stored predictions with a specified perturbation process and seed. A visually plausible synthetic example is not by itself a performance experiment.
+
+\section{Geometric preprocessing}
+CNN batches usually require a common spatial size. If an image of height $H$ and width $W$ is directly resized to $H'$ by $W'$, its axis-specific scale factors are
 \begin{equation}
-R_p = \frac{Z_2 - Z_1}{Z_2 + Z_1}, \quad R_I = \left( \frac{Z_2 - Z_1}{Z_2 + Z_1} \right)^2
-\label{eq:reflection_coefficient}
+s_y=\frac{H'}{H}, \qquad s_x=\frac{W'}{W}.
 \end{equation}
+When $s_x\neq s_y$, the transformation is anisotropic and changes apparent aspect ratios. An alternative is to crop a defined region, pad it to a square, and then resize it. If the square side is $d$, both axes use the same final factor $224/d$ in this project.
 
-The transmitted intensity fraction is given by $T_I = 1.0 - R_I$. High impedance mismatches (e.g., soft tissue to bone or air interfaces) cause near-total acoustic reflection ($R_I \approx 1.0$), whereas subtle impedance differentials between healthy breast parenchyma ($Z \approx 1.51 \times 10^6\text{ kg}/(\text{m}^2\text{s})$) and malignant collagenous stroma ($Z \approx 1.62 \times 10^6\text{ kg}/(\text{m}^2\text{s})$) generate the delicate backscattered echoes that define sonographic diagnostic features \citep{Stavros1995}.
+This geometric property is deterministic, but its effect on classification is empirical. Cropping can discard useful context; reflection padding can introduce repeated boundary structure; and mask-guided training can differ from unmasked deployment. A fair ablation must hold the partition, architecture, optimisation budget, and random seeds constant while changing only the preprocessing strategy.
 
-\subsection{Frequency-Dependent Acoustic Attenuation}
-As acoustic energy penetrates deeper anatomical planes, wave amplitude decreases exponentially due to viscous thermal absorption and diffuse scattering. Depth-dependent acoustic pressure attenuation is formalized by the Beer-Lambert law:
+\section{Contrast Limited Adaptive Histogram Equalisation}
+Global histogram equalisation uses an image-wide cumulative distribution and can over-emphasise background variation. Contrast Limited Adaptive Histogram Equalisation (CLAHE) instead applies local mappings and clips histogram mass before redistribution \citep{Zuiderveld1994}. For a contextual region with histogram $h(k)$, a conceptual clipped histogram is
 \begin{equation}
-P(z) = P_0 \cdot e^{-\alpha(f) \cdot z}
-\label{eq:attenuation_law}
+h_c(k)=\min(h(k),\beta)+r(k),
 \end{equation}
-where $P_0$ is initial transmitted pressure, $z$ is acoustic path depth (cm), and $\alpha(f)$ is the frequency-dependent attenuation coefficient, typically modeled as a power law:
+where $\beta$ is the clip threshold and $r(k)$ distributes the clipped mass. Interpolation between neighbouring mappings reduces tile-boundary discontinuities.
+
+The implementation in this repository applies OpenCV CLAHE to the luminance channel in LAB colour space, with a clip limit of 2.0 and a $16\times16$ tile grid. This is a documented configuration choice, not evidence that CLAHE improves discrimination. Its effect requires a controlled ablation and should include both predictive and image-quality analysis.
+
+\section{Convolutional representation learning}
+CNNs learn filters through repeated convolution, non-linearity, and aggregation. For an activation tensor $\mathbf{X}^{(l-1)}$, a layer can be represented schematically as
 \begin{equation}
-\alpha(f) = \alpha_0 \cdot f^\gamma
-\label{eq:power_law_attenuation}
+\mathbf{X}^{(l)}=\sigma\!\left(\mathbf{W}^{(l)}*\mathbf{X}^{(l-1)}+\mathbf{b}^{(l)}\right).
 \end{equation}
-where $\alpha_0$ represents tissue attenuation (approx. $0.5 - 0.75\text{ dB}/(\text{cm}\cdot\text{MHz})$ in healthy breast tissue, elevating to $> 1.5\text{ dB}/(\text{cm}\cdot\text{MHz})$ in dense malignant carcinomas) and $\gamma \approx 1.0 - 1.1$ for biological soft tissues \citep{Sikhakhane2024}. To compensate for this depth-dependent signal loss, modern clinical ultrasound scanners utilize hardware Time Gain Control (TGC) arrays, which amplify returning electrical signals logarithmically based on arrival latency.
+Medical-image datasets are often much smaller than general computer-vision corpora, so transfer learning is commonly used to initialise useful low- and mid-level features \citep{Litjens2017}.
 
-\section{Mathematical Physics of Acoustic Speckle Noise}
-While specular reflections occur at large, smooth anatomical boundaries whose dimensions exceed the acoustic wavelength ($d \gg \lambda$), biological breast tissue is predominantly composed of sub-resolution microscopic scatterers (cells, collagen bundles, micro-vessels) where $d \ll \lambda$. 
-
-\subsection{Interference Mechanics and Rayleigh Statistics}
-When the transmitted acoustic pulse illuminates a resolution cell containing thousands of randomly distributed microscopic scatterers, the backscattered wave received at the transducer element represents the coherent superposition of elementary spherical wavelets:
+\subsection{ResNet-50}
+Residual networks learn a residual function around an identity path,
 \begin{equation}
-A(t) \cos(\omega_0 t + \theta(t)) = \sum_{k=1}^{N} a_k \cos(\omega_0 t + \phi_k)
-\label{eq:superposition_scatter}
+\mathbf{y}=\mathcal{F}(\mathbf{x},\{\mathbf{W}_i\})+\mathbf{x},
 \end{equation}
-where $a_k$ and $\phi_k$ are the amplitude and phase of the $k$-th individual scatterer. Because scatterer spatial positions are distributed randomly relative to the acoustic wavelength ($\lambda \approx 0.15\text{ mm}$ at $10\text{ MHz}$), the phase angles $\phi_k$ are uniformly distributed over $[-\pi, \pi]$.
+which supports optimisation of deeper architectures \citep{He2016}. In this project, the original classification layer is replaced by dropout and a two-output linear layer.
 
-The resulting constructive and destructive phase interference produces a granular, pseudo-random intensity texture termed \textbf{acoustic speckle noise}. In fully developed speckle where scatterer density is high ($N \gg 1$), the real and imaginary components of the received complex signal follow independent zero-mean Gaussian distributions by the Central Limit Theorem. Consequently, the backscattered envelope amplitude $A = |A(t)|$ adheres to a \textbf{Rayleigh Probability Density Function (PDF)}:
+\subsection{EfficientNet-B0}
+EfficientNet uses coordinated scaling of network depth, width, and input resolution, with the B0 model serving as the baseline architecture \citep{Tan2019}. Its mobile inverted bottleneck blocks include squeeze-and-excitation operations that reweight channels \citep{Hu2018}. The project replaces the classifier with dropout and a two-output linear layer.
+
+\subsection{Custom CNN baseline}
+The custom model provides a compact, from-scratch baseline with four convolutional stages, batch normalisation, ReLU activations, max pooling, adaptive average pooling, dropout, and a two-output layer. It helps distinguish the contribution of transfer learning from that of the surrounding pipeline, but a fair comparison requires equivalent split integrity and a predeclared tuning budget.
+
+\section{Outputs, confidence, and explanation}
+The two logits are converted to a mutually exclusive probability vector using softmax:
 \begin{equation}
-p(A) = \frac{A}{\sigma^2} \exp\left( -\frac{A^2}{2\sigma^2} \right), \quad A \ge 0
-\label{eq:rayleigh_distribution}
+p(y=c\mid\mathbf{x})=\frac{\exp(z_c)}{\sum_{j=1}^{K}\exp(z_j)}.
 \end{equation}
-where $\sigma^2$ represents the underlying diffuse backscatter variance. The mean $\mu_A$ and standard deviation $\sigma_A$ of a Rayleigh distribution are strictly coupled:
-\begin{equation}
-\mu_A = \sigma \sqrt{\frac{\pi}{2}}, \quad \sigma_A = \sigma \sqrt{2 - \frac{\pi}{2}} \implies \frac{\mu_A}{\sigma_A} = \frac{\sqrt{\pi/2}}{\sqrt{2 - \pi/2}} \approx 1.91
-\label{eq:snr_speckle}
-\end{equation}
+Softmax normalisation does not guarantee calibration. Neural networks can be overconfident, so a displayed score must not be interpreted as diagnostic certainty \citep{Guo2017}. Calibration should be evaluated on an independent validation design if the model is developed further.
 
-This fundamental relationship proves that acoustic speckle has a constant intrinsic Signal-to-Noise Ratio ($\text{SNR} \approx 1.91$), confirming its strictly signal-dependent nature.
+Grad-CAM uses gradients flowing into a convolutional layer to form a coarse localisation map \citep{Selvaraju2017}. Such maps can support debugging and hypothesis generation, but they neither prove causal reasoning nor validate clinical relevance. This project labels them as research visualisations.
 
-\subsection{Multiplicative Noise Degradation Model}
-Unlike additive white Gaussian noise (AWGN) encountered in digital optical photography, medical ultrasound speckle operates as a multiplicative, signal-dependent process \citep{Jiang2023}. The observed 2D B-mode digital pixel intensity matrix $I(x, y)$ is formulated mathematically as:
-\begin{equation}
-I(x, y) = f(x, y) \cdot \eta_m(x, y) + \eta_a(x, y)
-\label{eq:speckle_multiplicative_model}
-\end{equation}
-where $f(x, y)$ represents the uncorrupted, ideal tissue acoustic reflectivity function, $\eta_m(x, y)$ is the multiplicative Rayleigh speckle noise component with mean $\mathbb{E}[\eta_m] = 1.0$ and variance $\sigma_m^2$, and $\eta_a(x, y) \sim \mathcal{N}(0, \sigma_a^2)$ denotes additive electronic and thermal sensor noise introduced during analog-to-digital conversion (ADC).
+\section{Dataset provenance and evaluation design}
+The BUSI dataset paper describes 780 images with normal, benign, and malignant labels and associated masks \citep{AlDhabyani2020}. OASBUD includes multiple views and radio-frequency-derived information for breast lesions \citep{Piotrzkowska2017}. These characteristics make group-level separation essential. When related views cross partitions, a model may encounter subject-specific appearance during both optimisation and evaluation.
 
-Because the local variance of multiplicative noise scales directly with the true signal intensity $\text{Var}[I(x, y)] \propto f^2(x, y) \cdot \sigma_m^2$, standard convolutional kernels trained under additive noise assumptions experience severe gradient variance spikes in bright echogenic tissue regions and complete feature suppression in hypoechoic tumor regions.
+Reproducible evaluation therefore requires more than a random seed. A defensible record includes original subject identifiers, grouping rules, dataset version and licence, checksums, exclusions, split manifest, preprocessing configuration, model configuration, training seed, selected checkpoint, and per-image predictions. Only then can summary metrics be independently regenerated.
 
-\section{Clinical BI-RADS Lexicon and Morphological Biomarkers}
-To standardize ultrasound reporting and risk stratification, the American College of Radiology (ACR) established the Breast Imaging-Reporting and Data System (BI-RADS) ultrasound lexicon \citep{Mendelson2013}. Radiologists evaluate specific morphological and acoustic biomarkers to categorize lesions from BI-RADS 1 (negative) to BI-RADS 6 (biopsy-proven malignancy).
+\section{Literature synthesis and research gap}
+The literature establishes several relevant components: public breast-ultrasound datasets \citep{AlDhabyani2020,Piotrzkowska2017}; deep representation learning for medical images \citep{Litjens2017,Cheng2016}; efficient and residual transfer-learning architectures \citep{He2016,Tan2019}; contrast enhancement \citep{Zuiderveld1994}; and perturbation-based robustness testing \citep{Jiang2023}. The gap addressed here is practical integration with an explicit evidence boundary. A classifier, dashboard, and polished report can appear complete while still lacking the provenance needed to justify their headline numbers.
 
-\subsection{Key Diagnostic Biomarkers}
-\begin{itemize}
-    \item \textbf{Lesion Shape:} Benign lesions typically exhibit regular, oval, or round geometries with smooth contours (e.g., fibroadenomas). Malignant masses exhibit irregular, non-symmetrical shapes driven by aggressive, chaotic cellular proliferation \citep{Stavros1995}.
-    \item \textbf{Margin Characteristics:} Margin definition provides the highest single predictive value for malignancy. Benign lesions feature circumscribed, well-defined boundaries. Malignant lesions display non-circumscribed margins characterized by \textit{microlobulations} (small ripples along the border), \textit{angular margins} (sharp jagged edges), and \textit{spiculations} (radiating fibrous lines invading surrounding parenchyma) \citep{Stavros1995, Mendelson2013}.
-    \item \textbf{Echogenicity and Posterior Acoustic Shadowing:} Neoplastic malignant carcinomas typically present as \textit{hypoechoic} masses (appearing markedly darker than adjacent subcutaneous fat). Furthermore, dense desmoplastic collagen stroma inside malignant tumors causes extreme acoustic wave attenuation (Equation~\ref{eq:attenuation_law}), generating prominent \textbf{posterior acoustic shadowing} (a dark acoustic shadow trailing directly beneath the lesion). In contrast, fluid-filled benign cysts generate \textbf{posterior acoustic enhancement} (a bright echogenic column behind the mass due to minimal fluid attenuation) \citep{Stavros1995}.
-    \item \textbf{Orientation (Height-to-Width Ratio):} Lesion growth orientation relative to anatomical tissue planes is a critical clinical biomarker:
-    \begin{itemize}
-        \item \textit{Parallel Orientation (Wider-than-Tall, $H/W < 1.0$):} Benign masses grow horizontally along Cooper's ligaments and ductal planes.
-        \item \textit{Non-Parallel Orientation (Taller-than-Wide, $H/W > 1.0$):} Malignant lesions invade vertically across anatomical tissue planes, exhibiting a vertical height greater than their transverse width ($H/W > 1.0$). This feature carries a clinical positive predictive value (PPV) for malignancy exceeding $80\%$ \citep{Stavros1995, Mendelson2013}.
-    \end{itemize}
-\end{itemize}
-
-\section{Morphological Aspect Ratio Distortion in Standard Deep Learning Pipelines}
-Despite the diagnostic significance of the $H/W$ orientation ratio, standard deep learning computer vision frameworks (such as PyTorch and TensorFlow) require fixed square spatial dimensions (typically $224 \times 224 \times 3$) for batch tensor processing.
-
-\subsection{Mathematical Formulation of Direct Anamorphic Distortion}
-Standard preprocessing workflows apply direct anamorphic interpolation to resize rectangular clinical ultrasound scans ($H_{orig} \times W_{orig}$, e.g., $500 \times 700$ pixels) directly into square neural network tensors ($H_{resized} \times W_{resized} = 224 \times 224$). This direct transformation scales the horizontal and vertical spatial axes with non-uniform scaling factors $s_x = W_{resized} / W_{orig}$ and $s_y = H_{resized} / H_{orig}$ where $s_x \ne s_y$.
-
-The resulting \textbf{Lesion Aspect Ratio Geometric Distortion Error ($\mathcal{AR}$)} is defined mathematically as:
-\begin{equation}
-\mathcal{AR} = \left| 1.0 - \frac{W_{resized} / H_{resized}}{W_{orig} / H_{orig}} \right| \times 100\%
-\label{eq:aspect_ratio_error_formulation}
-\end{equation}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.82\textwidth]{figures/fig6_aspect_ratio_error.png}
-    \caption{Quantitative comparison of Lesion Aspect Ratio Geometric Distortion Error ($\%$) across standard anamorphic resizing, default center cropping, and the proposed ROI reflection square padding framework.}
-    \label{fig:aspect_ratio_distortion}
-\end{figure}
-
-As quantified in Figure~\ref{fig:aspect_ratio_distortion}, direct anamorphic resizing introduces an average geometric distortion error of $\mathcal{AR} = +38.5\%$. This artificial spatial compression flattens taller-than-wide malignant lesions ($H/W = 1.35$) into horizontal ovals ($H/W = 0.96$), effectively destroying the cardinal BI-RADS vertical growth biomarker and corrupting the spatial feature representations learned by convolutional kernels.
-
-\section{Contrast Limited Adaptive Histogram Equalization (CLAHE) in Sonography}
-Medical breast sonograms suffer from inherently low dynamic contrast: dark hypoechoic malignant masses frequently blend into surrounding acoustic shadows, while delicate microlobulated margin spiculations are obscured by background speckle noise.
-
-\subsection{Limitations of Global Histogram Equalization}
-Standard Global Histogram Equalization (GHE) transforms the image intensity distribution based on the global cumulative distribution function (CDF). However, GHE completely fails in medical ultrasound because clinical sonograms contain extensive homogeneous regions of dark acoustic background. Consequently, GHE over-allocates gray levels to background noise, causing extreme over-amplification of high-frequency speckle noise spikes whilst washing out subtle diagnostic margin gradients.
-
-\subsection{Localized Tile Equalization and Clip Limit Mechanics}
-Contrast Limited Adaptive Histogram Equalization (CLAHE) resolves this failure by partitioning the image matrix into a grid of small, localized contextual tiles (e.g., $8 \times 8$ or $16 \times 16$ grid) \citep{Zuiderveld1994}. Within each contextual tile, the local intensity histogram $h(k)$ is computed for gray levels $k \in [0, L-1]$:
-\begin{equation}
-h(k) = \sum_{x=1}^{M} \sum_{y=1}^{N} \delta(I(x, y) - k)
-\label{eq:tile_histogram}
-\end{equation}
-
-To prevent noise over-amplification in homogeneous soft tissue, a contrast clip limit threshold $\beta$ is enforced. Any histogram bin exceeding $\beta$ is clipped, and the total surplus pixel mass $\Delta = \sum_{k} \max(0, h(k) - \beta)$ is redistributed uniformly across all $L$ gray levels:
-\begin{equation}
-h_{\text{clipped}}(k) = \begin{cases} 
-\beta + \frac{\Delta}{L}, & \text{if } h(k) \ge \beta \\
-h(k) + \frac{\Delta}{L}, & \text{if } h(k) < \beta 
-\end{cases}
-\label{eq:clahe_clipping}
-\end{equation}
-
-The cumulative distribution function (CDF) $P(k)$ is then computed for the clipped histogram and mapped to the output dynamic range:
-\begin{equation}
-y(x, y) = (y_{\max} - y_{\min}) \cdot P(k) + y_{\min}, \quad \text{where } P(k) = \frac{1}{M \cdot N} \sum_{j=0}^{k} h_{\text{clipped}}(j)
-\label{eq:clahe_mapping}
-\end{equation}
-
-To eliminate artificial boundary steps between adjacent contextual tiles, bilinear interpolation is applied across four neighboring tile transfer functions.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figures/fig5_snr_cnr.png}
-    \caption{Quantitative Signal-to-Noise Ratio ($\text{SNR}_{\text{dB}}$) and Contrast-to-Noise Ratio ($\text{CNR}$) metric comparison across raw, direct-resized, and proposed CLAHE-enhanced ROI preprocessing pipelines.}
-    \label{fig:snr_cnr_metrics}
-\end{figure}
-
-As illustrated in Figure~\ref{fig:snr_cnr_metrics}, localized CLAHE enhancement amplifies subtle margin spiculations and improves Contrast-to-Noise Ratios ($\text{CNR}$) by $+210\%$ ($3.48$ vs. $1.12$) and elevates effective Signal-to-Noise Ratios by $+10.4\text{ dB}$ ($24.6\text{ dB}$ vs. $14.2\text{ dB}$).
-
-\section{Evolution of Computer-Aided Diagnosis (CAD) in Ultrasound}
-The architectural paradigm of computer-assisted breast nodule classification has evolved across two major historical epochs:
-
-\subsection{Classical Hand-Crafted Feature Engineering Pipelines}
-During the 1990s and 2000s, automated ultrasound classification relied on multi-stage heuristic pipelines combining manual segmentation, hand-crafted feature extraction, and shallow machine learning classifiers \citep{Cheng2016}:
-\begin{itemize}
-    \item \textbf{Morphological Descriptors:} Mathematical metrics measuring mass geometry, including area, perimeter, circularity, compactness $C = P^2 / (4\pi A)$, normalized radial length (NRL), and aspect ratio ($H/W$) \citep{Drukker2002}.
-    \item \textbf{Texture Descriptors:} Gray-Level Co-occurrence Matrices (GLCM) computing Haralick statistical texture features (contrast, energy, homogeneity, entropy, correlation) \citep{Cheng2016}.
-    \item \textbf{Frequency and Gradient Descriptors:} Multi-scale 2D Gabor wavelet filters and Histograms of Oriented Gradients (HOG) to model acoustic frequency patterns.
-\end{itemize}
-
-Extracted feature vectors were classified using Support Vector Machines (SVMs), Linear Discriminant Analysis (LDA), or Random Forests \citep{Cheng2016}. While foundational, classical CAD suffered from severe limitations: feature extraction depended entirely on human heuristic design, and performance degraded catastrophic when evaluated across different ultrasound scanner manufacturers due to variable acoustic gain and speckle textures \citep{Jiang2023}.
-
-\subsection{Deep Convolutional Representation Learning}
-Deep learning fundamentally revolutionized medical image analysis by unifying feature extraction and classification into an end-to-end, differentiable optimization process \citep{Litjens2017}. Convolutional layers apply parameterized spatial filter kernels $\mathbf{W}^{(l)}$ to input feature activations $\mathbf{X}^{(l-1)}$:
-\begin{equation}
-\mathbf{X}^{(l)} = \sigma \left( \mathbf{W}^{(l)} * \mathbf{X}^{(l-1)} + \mathbf{b}^{(l)} \right)
-\label{eq:convolution_operation}
-\end{equation}
-where $*$ denotes 2D cross-correlation, $\mathbf{b}^{(l)}$ is a bias vector, and $\sigma(\cdot)$ is a non-linear activation function (e.g., ReLU, $\sigma(z) = \max(0, z)$).
-
-Through stacked convolutional hierarchies, deep networks autonomously extract representations spanning from low-level acoustic edge gradients in early layers to high-level BI-RADS diagnostic abstractions in deep layers \citep{He2016, Tan2019}.
-
-\section{Deep Transfer Learning Architectures in Medical Vision}
-Given that medical ultrasound datasets are constrained in sample size compared to massive computer vision corpora, transfer learning from ImageNet pre-trained weights is the established state-of-the-art paradigm \citep{Litjens2017}.
-
-\subsection{Deep Residual Networks (ResNet-50)}
-As neural networks deepen, standard feed-forward architectures suffer from the degradation problem: as network depth increases, training accuracy saturates and degrades rapidly due to vanishing gradients during backpropagation. He et al. \citep{He2016} introduced Deep Residual Learning, replacing direct mapping $\mathcal{H}(\mathbf{x})$ with a residual mapping formulation:
-\begin{equation}
-\mathbf{y} = \mathcal{F}(\mathbf{x}, \{\mathbf{W}_i\}) + \mathbf{x}
-\label{eq:residual_connection}
-\end{equation}
-where $\mathbf{x}$ and $\mathbf{y}$ are input and output vectors of the residual unit, and $\mathcal{F}$ represents the residual function to be learned. Identity shortcut connections allow gradients $\frac{\partial \mathcal{E}}{\partial \mathbf{x}}$ to backpropagate directly through the skip connection:
-\begin{equation}
-\frac{\partial \mathcal{E}}{\partial \mathbf{x}} = \frac{\partial \mathcal{E}}{\partial \mathbf{y}} \left( \frac{\partial \mathcal{F}}{\partial \mathbf{x}} + \mathbf{I} \right)
-\label{eq:gradient_residual}
-\end{equation}
-
-Even if the Jacobian $\frac{\partial \mathcal{F}}{\partial \mathbf{x}}$ approaches zero, the identity term $\mathbf{I}$ ensures stable gradient flow across 50+ convolutional layers.
-
-\subsection{Compound Scaling and Attention Networks (EfficientNet-B0)}
-Conventional CNN scaling arbitrarily scales only one dimension (depth, width, or input image resolution). Tan and Le \citep{Tan2019} developed \textbf{EfficientNet}, demonstrating that balanced scaling across depth ($d$), width ($w$), and resolution ($r$) achieves optimal parameter efficiency:
-\begin{equation}
-\text{depth: } d = \alpha^\phi, \quad \text{width: } w = \beta^\phi, \quad \text{resolution: } r = \gamma^\phi
-\label{eq:compound_scaling}
-\end{equation}
-\begin{equation}
-\text{subject to } \alpha \cdot \beta^2 \cdot \gamma^2 \approx 2, \quad \alpha \ge 1, \beta \ge 1, \gamma \ge 1
-\label{eq:compound_constraint}
-\end{equation}
-where $\phi$ is the user-specified compound scaling coefficient.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figures/fig4_noise_resilience.png}
-    \caption{Model diagnostic classification accuracy resilience across increasing synthetic speckle noise intensities ($\sigma$), comparing Proposed ROI Padded architectures against direct-resized and uncropped baselines.}
-    \label{fig:noise_resilience_curves}
-\end{figure}
-
-EfficientNet-B0 utilizes \textbf{Mobile Inverted Bottleneck Convolutions (MBConv)} with integrated \textbf{Squeeze-and-Excitation (SE) channel attention} \citep{Hu2018}. The SE block dynamically recalibrates channel-wise feature responses by explicitly modeling interdependencies between channels:
-\begin{equation}
-\mathbf{s} = \mathbf{F}_{scale}(\mathbf{u}_c, \mathbf{e}_c) = \sigma \left( \mathbf{W}_2 \cdot \text{ReLU}(\mathbf{W}_1 \cdot \mathbf{z}) \right)
-\label{eq:squeeze_excitation}
-\end{equation}
-where $\mathbf{z}$ is the global average pooled descriptor of spatial channel $\mathbf{u}_c$, and $\mathbf{W}_1, \mathbf{W}_2$ are dimensionality reduction and expansion parameter matrices. As illustrated in Figure~\ref{fig:noise_resilience_curves}, this dynamic attention mechanism enables EfficientNet-B0 to suppress uninformative speckle noise channels whilst selectively amplifying diagnostic margin feature channels.
-
-\section{Prior Literature Synthesis and Comparative Benchmark}
-To position this research within the broader academic landscape, Table~\ref{tab:literature_comparison} synthesizes landmark studies in automated breast ultrasound CAD, detailing their dataset composition, modeling paradigms, noise handling strategies, reported performance benchmarks, and key clinical limitations.
-
-\begin{table}[htbp]
-\centering
-\caption{Comprehensive synthesis and comparative analysis of landmark literature in breast ultrasound computer-aided diagnosis.}
-\label{tab:literature_comparison}
-\begin{tabularx}{\textwidth}{@{}lXllXX@{}}
-\toprule
-\textbf{Study} & \textbf{Dataset \& Size} & \textbf{Architecture} & \textbf{Accuracy} & \textbf{Noise Handling} & \textbf{Clinical Limitations} \\ \midrule
-Al-Dhabyani et al. (2020) & BUSI (780 scans) & VGG-16, ResNet-50 & 88.5\% & None (Direct Resize) & High aspect ratio distortion ($+38.5\%$); vulnerable to speckle. \\
-Piotrzkowska et al. (2017) & OASBUD (100 cases, RF) & Classical QUS + SVM & 84.0\% & Homomorphic RF Filtering & Requires raw radiofrequency data; not applicable to standard B-mode. \\
-Cheng et al. (2016) & Multi-center (400 scans) & Stacked Autoencoders & 89.2\% & Gaussian smoothing & Blurs microlobulated tumor margins; high false-positive rate. \\
-Jiang et al. (2023) & In-house BUS (1,200 scans) & ResNet-50, Swin-T & 91.4\% & SRAD Anisotropic Diffusion & Performance drops 35\% under out-of-distribution speckle noise. \\
-Sikhakhane et al. (2024) & Synthetic + Clinical (600) & Classical ML (SVM, RF) & 86.8\% & Lee / Frost / DnCNN & Traditional ML lacks hierarchical deep feature extraction. \\
-\textbf{This Dissertation} & \textbf{BUSI + OASBUD + BrEaST (1,178)} & \textbf{EfficientNet-B0 + ROI Pad + CLAHE} & \textbf{98.2\%} & \textbf{ROI Reflection Pad + CLAHE} & \textbf{Eliminates $\mathcal{AR}$ distortion ($0.0\%$); retains 92.1\% acc at $\sigma=0.15$.} \\ \bottomrule
-\end{tabularx}
-\end{table}
-
-\section{Critical Research Gap Analysis}
-From the exhaustive literature synthesis presented in Table~\ref{tab:literature_comparison}, four major unresolved technical gaps emerge:
-\begin{enumerate}
-    \item \textbf{Neglect of Geometric Aspect Ratio Distortion:} Prior deep learning studies indiscriminately apply direct anamorphic resizing to conforms ultrasound scans into square neural network tensors. This introduces $+38.5\%$ aspect ratio distortion, flattening critical taller-than-wide malignant lesions and causing convolutional kernels to learn corrupted geometric representations.
-    \item \textbf{Absence of Rigorous Out-of-Distribution Noise Benchmarking:} Most existing literature evaluates models exclusively on pristine, filtered benchmark partitions. Deep networks are deployed without empirical knowledge of their mathematical breakdown thresholds under varying acoustic noise intensities ($\sigma$).
-    \item \textbf{Sub-Optimal Contrast Enhancement:} Traditional global histogram equalization exacerbates background speckle noise, while standard spatial smoothing filters blur microlobulated tumor margins essential for early cancer detection.
-    \item \textbf{Lack of Clinical Softmax Constraint & Pseudo-Label Calibration:} Many existing CAD prototypes utilize uncalibrated sigmoid thresholds that allow physically impossible overlapping multi-label diagnoses and fail to optimize confidence thresholds for semi-supervised expansion.
-\end{enumerate}
-
-This dissertation directly resolves these fundamental gaps through the formulation of the Proposed ROI Reflection Square Padding algorithm, biophysical CLAHE contrast tuning, the 4-Stage Comparative Noise Injection framework, and semi-supervised threshold optimization.
+Accordingly, this dissertation treats data auditability as part of the modelling method. It implements the full software path, reports the current executable output as provisional, and defines the group-aware experiment required before comparative or clinical conclusions can be drawn.

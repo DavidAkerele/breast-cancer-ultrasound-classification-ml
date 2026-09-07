@@ -1,71 +1,16 @@
 \chapter{Discussion and Critical Reflection}
-\label{ch:discussion}
 
-\section{Introduction}
-This chapter synthesizes the experimental findings against the foundational research questions and hypotheses formulated in Chapter 1. We critically evaluate the biophysical and architectural mechanisms driving model performance, examine clinical translation and radiologist workflow integration, reflect upon legal, regulatory, and ethical governance, and analyze the methodological limitations and threats to validity of this study.
+\section{Interpretation of the current work}
+The project demonstrates an end-to-end research implementation rather than a validated clinical classifier. Its useful technical contribution is the consolidation of preprocessing, model loading, inference, and evaluation into one auditable path. This prevents a common source of irreproducibility: reporting metrics from a pipeline that differs from the deployed preprocessing path.
 
-\section{Synthesis of Empirical Findings with Research Hypotheses}
-The empirical results established in Chapter 4 provide robust confirmation for all three central research hypotheses:
+\section{Data validity and threats to inference}
+The current local cohort is unsuitable for estimating patient-independent generalisation. Multiple views of an OASBUD subject and BrEaST cases occur across splits, while BUSI source identifiers were discarded during file renaming. These issues can inflate performance estimates and make comparisons between architectures unreliable. The provisional checkpoint result in Chapter~\ref{ch:results} must therefore not be interpreted as clinical sensitivity, specificity, or comparative superiority.
 
-\subsection{Validation of Hypothesis 1 ($H_1$): Non-Linear Speckle Degradation}
-Hypothesis 1 posited that multiplicative acoustic speckle noise degrades deep learning classification non-linearly, with uncropped anamorphic architectures suffering severe accuracy drops ($> 30\%$) under high noise densities. 
+\section{Preprocessing claims}
+Reflection padding preserves the aspect ratio of the image crop by construction, and CLAHE is implemented as an explicit configurable operation. Neither fact establishes improved diagnostic performance. Such a claim requires matched experiments in which crop strategy and CLAHE are varied while data split, model, seed, and training budget are controlled. The same caution applies to synthetic noise simulations: they are useful visual demonstrations, but require measured prediction-level experiments before they become robustness findings.
 
-The empirical noise resilience stress-test (Table~\ref{tab:speckle_benchmark} and Figure~\ref{fig:noise_resilience_curves}) directly validated this hypothesis. When subjected to increasing Rayleigh speckle noise ($\sigma = 0.01 \rightarrow 0.15$), the direct anamorphic resizing baseline suffered a catastrophic drop in classification accuracy from $88.4\%$ down to $52.3\%$ (a $36.1\%$ absolute performance collapse). This degradation occurs because standard spatial pooling mechanisms (e.g., Max Pooling) propagate peak noise spikes through hidden layer activations, distorting latent feature manifolds and causing the model to misclassify irregular background speckle textures as malignant tissue spiculation.
+\section{Clinical, ethical, and regulatory boundaries}
+The dashboard is a research interface only. Its predictions, heatmaps, morphology heuristics, and image-quality estimates are not clinical assessments and should not influence care. The interface no longer assigns BI-RADS categories or clinical priority. Any future clinical translation would require a locked model, external validation at subject and site level, calibration and human-factors studies, governance for dataset consent and privacy, and an appropriate medical-device regulatory pathway. A confidence score is not an estimate of diagnostic certainty.
 
-\subsection{Validation of Hypothesis 2 ($H_2$): Elimination of Aspect Ratio Distortion}
-Hypothesis 2 stated that the Proposed ROI Reflection Square Padding algorithm would eliminate geometric distortion ($\mathcal{AR} = 0.0\%$) and boost malignant detection sensitivity above $95\%$.
-
-The mathematical proof (Equation~\ref{eq:zero_distortion_proof}) and empirical benchmarking (Figure~\ref{fig:aspect_ratio_distortion} and Table~\ref{tab:model_performance_summary}) confirmed this hypothesis. By applying symmetric reflection boundary padding, the proposed algorithm enforced isotropic spatial scaling ($s_x = s_y$), reducing geometric aspect ratio distortion from $+38.5\%$ down to $0.0\%$. Preserving the vertical orientation ($H/W > 1.0$) of malignant tumors enabled the fine-tuned EfficientNet-B0 network to achieve a malignant detection sensitivity of \textbf{$97.5\%$}, producing only 2 false negatives out of 80 malignant cases.
-
-\subsection{Validation of Hypothesis 3 ($H_3$): Contrast Enhancement and Attention Resilience}
-Hypothesis 3 proposed that localized CLAHE contrast redistribution paired with squeeze-and-excitation channel attention in EfficientNet-B0 would elevate Contrast-to-Noise Ratios ($\text{CNR}$) by over $100\%$ and sustain accuracy above $90\%$ under severe noise ($\sigma = 0.15$).
-
-Empirical findings in Chapter 4 substantiated this hypothesis. CLAHE preprocessing improved lesion-to-background Contrast-to-Noise Ratios by $+210\%$ ($3.48$ vs. $1.12$) and elevated effective Signal-to-Noise Ratios by $+10.4\text{ dB}$ ($24.6\text{ dB}$ vs. $14.2\text{ dB}$). Furthermore, under severe Rayleigh speckle degradation ($\sigma = 0.15$), the proposed EfficientNet-B0 architecture maintained \textbf{$92.1\%$ test accuracy}, significantly outperforming ResNet-50 ($84.6\%$) and the Custom CNN baseline ($61.2\%$).
-
-\section{Biophysical and Architectural Insights}
-The superior performance of EfficientNet-B0 over deeper architectures like ResNet-50 stems from fundamental architectural differences in feature processing:
-
-\subsection{Squeeze-and-Excitation Attention as a Biophysical Noise Filter}
-In ultrasound B-mode imaging, acoustic speckle noise is randomly distributed across spatial pixel matrices, whereas diagnostic tumor features (microlobulations, acoustic shadow columns) exhibit coherent spatial structures \citep{Sikhakhane2024}. The Squeeze-and-Excitation (SE) attention blocks in EfficientNet-B0 compute global channel descriptors $\mathbf{z}_c$ via global average pooling (Equation~\ref{eq:squeeze_excitation}). 
-
-Because diffuse speckle noise averages toward zero across large spatial feature maps, feature channels corrupted by noise receive low channel activation weights $\mathbf{s}_c \approx 0$. Conversely, channels capturing localized hypoechoic masses and sharp boundary gradients receive high activation weights $\mathbf{s}_c \approx 1$. Thus, SE attention acts as an adaptive, differentiable spatial-frequency filter, suppressing speckle-dominated feature channels prior to classification.
-
-\subsection{Reflection Boundary Padding vs. Zero-Padding Discontinuities}
-Standard convolutional operations applied to zero-padded (black border) image tensors encounter extreme intensity step discontinuities at matrix boundaries ($I(x) = 220 \rightarrow I(x+1) = 0$). These artificial gradient steps trigger intense convolutional kernel activations that propagate through hidden layers, competing with subtle pathological lesion features. 
-
-By mirroring true tissue acoustic echogenicity across borders via \textsf{BORDER\_REFLECT\_101} (Equation~\ref{eq:reflection_padding}), the proposed padding algorithm eliminates artificial edge gradients, ensuring that convolutional activations focus exclusively on biological lesion morphology.
-
-\section{Clinical Decision Support and Radiologist Workflow Integration}
-In clinical oncology, AI diagnostic tools are not intended to replace human radiologists, but rather to function as intelligent, human-in-the-loop decision support systems \citep{Topol2019, Kelly2019}.
-
-\subsection{Radiology Triage and Second-Reader Deployment}
-The proposed CAD framework can be integrated into clinical Picture Archiving and Communication Systems (PACS) across two primary operational paradigms:
-\begin{enumerate}
-    \item \textbf{High-Confidence Triage System:} Routine screening sonograms with high-confidence benign predictions ($P(\text{Benign}) > 0.98$) can be triaged to standard reporting queues, allowing radiologists to prioritize high-risk, ambiguous, or urgent malignant cases ($P(\text{Malignant}) > 0.50$).
-    \item \textbf{Concurrent Second Reader:} During live ultrasound examinations, the CAD system provides real-time boundary highlighting and probability estimation, mitigating cognitive fatigue during long diagnostic shifts and reducing inter-observer diagnostic variability.
-\end{enumerate}
-
-\subsection{Explainability via Gradient-Weighted Class Activation Mapping (Grad-CAM)}
-To establish clinical trust, medical AI platforms must offer visual explainability \citep{Selvaraju2017}. Integrating Grad-CAM heatmaps allows clinicians to verify that neural network predictions are driven by authentic BI-RADS pathological cues (such as hypoechoic central cores and posterior acoustic attenuation columns) rather than spurious background artifacts or scanner metadata text.
-
-\section{Regulatory, Legal, and Ethical Governance}
-Deploying artificial intelligence systems in active clinical environments requires strict compliance with international medical device frameworks and ethical governance principles:
-
-\subsection{Software as a Medical Device (SaMD) Regulatory Pathways}
-Automated cancer classification systems are categorized as Software as a Medical Device (SaMD) under both the United States Food and Drug Administration (FDA) 510(k) premarket notification framework and the European Union Medical Device Regulation (EU MDR 2017/745) Class IIa/IIb requirements \citep{Kelly2019}. Regulatory approval mandates rigorous multi-center clinical validation, robust out-of-distribution stress-testing (such as the 4-Stage Noise Matrix established in this thesis), and deterministic fail-safe mechanisms.
-
-\subsection{Legal Liability and Clinical Accountability}
-A central legal barrier to clinical CAD adoption is the allocation of diagnostic liability. If an algorithmic system issues a false negative recommendation that misleads a clinician into delaying a biopsy, legal liability currently rests with the attending radiologist. Consequently, CAD systems must present probabilistic uncertainty bounds (such as the prediction certainty boxplots developed in this project) rather than deterministic binary decrees, ensuring the clinician maintains final diagnostic authority.
-
-\subsection{Data Privacy, GDPR, and HIPAA Compliance}
-Training multi-center deep learning architectures necessitates strict compliance with data privacy regulations, including the Health Insurance Portability and Accountability Act (HIPAA) in the United States and the General Data Protection Regulation (GDPR) in the European Union. All ultrasound scans utilized in this dissertation were fully anonymized at the source institutions, with all patient personal identifiers, scanner serial numbers, and hospital metadata stripped prior to curation.
-
-\section{Threats to Validity and Methodological Limitations}
-While the proposed framework achieves high diagnostic benchmarks, several technical limitations must be acknowledged:
-
-\begin{enumerate}
-    \item \textbf{2D Static B-Mode vs. 3D Automated Breast Ultrasound (ABUS):} This study focused on 2D static B-mode ultrasound frames. In clinical practice, hand-held ultrasound is a dynamic real-time modality where sonographers assess lesions across multiple scanning angles. Future extensions should incorporate 3D ABUS volumetric sweeps.
-    \item \textbf{Dependence on Initial ROI Localization:} The proposed padding pipeline relies on binary lesion bounding boxes (provided by expert sonographers or automated U-Net segmentation models). In unsegmented whole-breast scans, inaccurate initial bounding box detection could truncate lesion margins.
-    \item \textbf{Transducer Hardware Domain Shift:} Although validated across three multi-center repositories (BUSI, OASBUD, BrEaST), ultrasound image characteristics vary across manufacturers (e.g., GE, Siemens, Philips, Ultrasonix) due to proprietary beamforming and post-processing algorithms.
-    \item \textbf{Histological Subtype Imbalance:} Public ultrasound datasets predominantly contain common invasive ductal carcinomas and benign fibroadenomas, with limited representation of rare subtypes such as mucinous, medullary, or metaplastic breast carcinomas.
-\end{enumerate}
+\section{Remedial study design}
+The next study iteration should rebuild splits by subject before any model selection. A manifest should retain original identifiers, source dataset, class, image/view, split, and checksum. After freezing the test set, all architecture and preprocessing choices should be made using training/validation data only. The final report should include uncertainty intervals, subgroup/site analysis where metadata permits, failure cases, calibration, and all excluded images.

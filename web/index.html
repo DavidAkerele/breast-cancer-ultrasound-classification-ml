@@ -1,495 +1,285 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OncoVision AI | MSc Dissertation Diagnostic Suite</title>
-    
-    <!-- Primary Meta Tags -->
-    <meta name="title" content="OncoVision AI | MSc Dissertation Breast Cancer Diagnostics">
-    <meta name="description" content="MSc Computer Science research suite for breast-ultrasound classification, ROI resizing, and acoustic-noise analysis.">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-
-    <!-- Fonts -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#062d2c">
+    <meta name="description" content="Research-only breast-ultrasound classification and reproducibility workspace.">
+    <title>OncoVision Research · Ultrasound Classification</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- KaTeX for Publication-Grade LaTeX Math Formulas -->
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,650&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
-
-    <!-- Marked.js for Rendering Thesis Documentation -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-    <link rel="stylesheet" href="style.css?v=16">
+    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <link rel="icon" href="favicon.svg?v=20260907" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css?v=20260907d">
 </head>
-<body class="dark-theme">
-    <div class="app-container">
-        <!-- Expanded Sidebar Navigation Dock (210px) -->
-        <aside class="sidebar-dock">
-            <div class="brand-header">
-                <div class="brand-logo-badge" title="OncoVision AI MSc Suite">O<sup>+</sup></div>
-                <div class="brand-text">
-                    <span class="brand-name">OncoVision AI</span>
-                    <span class="brand-sub">MSc Dissertation</span>
-                </div>
-            </div>
-            
-            <nav class="nav-menu">
-                <button class="nav-item active" id="btnUiMode">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
-                        <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
-                        <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
-                        <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
-                    </svg>
-                    <span>Workstation</span>
-                </button>
-                
-                <button class="nav-item" id="btnNoiseMode">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                    </svg>
-                    <span>Acoustic Noise Lab</span>
-                </button>
+<body>
+    <a class="skip-link" href="#mainContent">Skip to workspace</a>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <a class="brand" href="#workstation" aria-label="OncoVision Research home">
+                <img src="logo.svg" alt="" width="42" height="42">
+                <span>
+                    <strong>OncoVision</strong>
+                    <small>Research workspace</small>
+                </span>
+            </a>
 
-                <button class="nav-item" id="btnDatasetMode">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    <span>Dataset Explorer</span>
+            <nav class="primary-nav" aria-label="Workspace sections">
+                <button class="nav-button is-active" type="button" data-view="workstation">
+                    <span>Single image</span><small>Inspect one model output</small>
                 </button>
-                
-                <button class="nav-item" id="btnThesisMode">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                    </svg>
-                    <span>Thesis Reader</span>
+                <button class="nav-button" type="button" data-view="noise">
+                    <span>Noise experiment</span><small>Seeded image perturbation</small>
+                </button>
+                <button class="nav-button" type="button" data-view="batch">
+                    <span>Batch evaluation</span><small>Review labelled examples</small>
+                </button>
+                <button class="nav-button" type="button" data-view="evidence">
+                    <span>Evidence record</span><small>Metrics and split audit</small>
+                </button>
+                <button class="nav-button" type="button" data-view="dataset">
+                    <span>Dataset explorer</span><small>Inspect local folders</small>
+                </button>
+                <button class="nav-button" type="button" data-view="documentation">
+                    <span>Documentation</span><small>Read project sources</small>
                 </button>
             </nav>
-            
-            <div class="sidebar-footer">
-                <div class="msc-tag">
-                    <span class="msc-label">MSc Project</span>
-                    <span class="author-name">David Akerele</span>
+
+            <div class="sidebar-status">
+                <div class="status-line">
+                    <span class="status-dot" id="systemStatusDot" aria-hidden="true"></span>
+                    <span id="systemStatus">Checking model…</span>
                 </div>
+                <dl>
+                    <div><dt>Loaded model</dt><dd id="loadedModel">—</dd></div>
+                    <div><dt>Evidence</dt><dd>Provisional</dd></div>
+                </dl>
             </div>
+
+            <p class="sidebar-foot">MSc dissertation prototype<br>Akerele David Damilola · 2026</p>
         </aside>
 
-        <!-- Main Content Canvas -->
-        <div class="main-canvas">
-            <!-- Header Bar -->
-            <header class="app-header-bar">
-                <div class="header-left">
-                    <h1 class="header-title">OncoVision AI <span class="badge msc">MSc Dissertation</span></h1>
-                    <p class="header-subtitle">Automated Breast Ultrasound Classification &bull; Biophysical Noise & ROI Resizing Analysis</p>
+        <div class="workspace">
+            <header class="topbar">
+                <button class="menu-button" id="menuButton" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
+                <div class="page-heading">
+                    <h1 id="viewTitle">Single-image inspection</h1>
+                    <p id="viewDescription">Trace one image through preprocessing, classification, and visual explanation.</p>
                 </div>
-                
-                <div class="header-controls">
-                    <div class="control-group">
-                        <span class="control-label">Loaded research model</span>
-                        <span id="loadedModel" class="model-chip">Checking availability…</span>
-                    </div>
-                    <div class="control-group">
-                        <label for="selectModelBackbone" class="control-label">Architecture</label>
-                        <select id="selectModelBackbone" class="glass-select">
-                            <option value="resnet50">ResNet-50</option>
+                <div class="global-controls" aria-label="Inference configuration">
+                    <label>Model
+                        <select id="modelSelect">
                             <option value="efficientnet_b0">EfficientNet-B0</option>
+                            <option value="resnet50">ResNet-50</option>
                             <option value="custom_cnn">Custom CNN</option>
                         </select>
-                    </div>
-
-                    <!-- Cropping & Resizing Strategy Selector -->
-                    <div class="control-group">
-                        <label for="selectCropStrategy" class="control-label">Crop & Resizing Strategy</label>
-                        <select id="selectCropStrategy" class="glass-select highlight">
-                            <option value="roi_crop" selected>🎯 ROI Crop (Padded Square)</option>
-                            <option value="center_crop">🔳 Center Crop (PyTorch Default)</option>
-                            <option value="direct_resize">📐 Direct Resize (Anamorphic)</option>
+                    </label>
+                    <label>Geometry
+                        <select id="cropSelect">
+                            <option value="roi_crop">ROI / square pad</option>
+                            <option value="center_crop">Centre crop</option>
+                            <option value="direct_resize">Direct resize</option>
                         </select>
-                    </div>
-
-                    <!-- CLAHE Contrast Enhancement Toggle -->
-                    <div class="control-group toggle-group">
-                        <label for="chkUseClahe" class="control-label">CLAHE Enhancement</label>
-                        <label class="switch">
-                            <input type="checkbox" id="chkUseClahe" checked>
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
+                    </label>
+                    <label class="check-control"><input id="claheToggle" type="checkbox" checked> CLAHE</label>
                 </div>
             </header>
 
-            <!-- CANVAS VIEW 1: DIAGNOSTIC WORKSTATION -->
-            <main id="viewWorkstation" class="view-panel active">
-                <div class="workstation-grid">
-                    <!-- Left Column: Image Viewports & Upload -->
-                    <section class="panel-card viewport-card">
-                        <div class="panel-header">
-                            <h3 class="panel-title">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                Image Acquisition & Spotlight Lens
-                            </h3>
-                            <div class="header-action-btns">
-                                <span class="gt-tag-badge unknown hidden" id="gtTagBadge">Ground Truth: --</span>
-                                <button class="btn-secondary hidden" id="btnChangeImage">Change Scan</button>
-                                <span class="status-indicator live" id="systemStatus" role="status" aria-live="polite" data-state="ready">Ready</span>
-                            </div>
+            <div class="evidence-strip" id="evidenceStrip" role="status">
+                <strong>Provisional evidence</strong>
+                <span id="auditSummary">Loading the data-integrity audit…</span>
+                <button type="button" data-open-view="evidence">Review evidence</button>
+            </div>
+
+            <main id="mainContent" tabindex="-1">
+                <section class="view is-active" id="view-workstation" aria-labelledby="workstationHeading">
+                    <div class="section-intro">
+                        <div>
+                            <h2 id="workstationHeading">Inspect a model output</h2>
+                            <p>Accepted files: PNG, JPEG, or TIFF up to 20 MB. Results are research artifacts, never a diagnosis.</p>
+                        </div>
+                        <div class="button-row">
+                            <label class="button primary" for="singleFile">Choose image</label>
+                            <input class="visually-hidden" id="singleFile" type="file" accept="image/png,image/jpeg,image/tiff">
+                            <button class="button secondary" id="loadSampleButton" type="button">Load labelled example</button>
+                            <button class="button quiet" id="compareButton" type="button" disabled>Compare available models</button>
+                        </div>
+                    </div>
+
+                    <button class="dropzone" id="singleDropzone" type="button">
+                        <span class="dropzone-mark" aria-hidden="true">↑</span>
+                        <strong>Choose or drop a breast-ultrasound image</strong>
+                        <span>The application records the selected preprocessing alongside the output.</span>
+                    </button>
+
+                    <div class="inference-layout is-hidden" id="inferenceLayout">
+                        <div class="image-comparison">
+                            <figure>
+                                <figcaption><span>Source image</span><small id="sourceMeta">Uploaded input</small></figcaption>
+                                <div class="image-frame"><img id="sourceImage" src="logo.svg" alt="Uploaded breast-ultrasound image"></div>
+                            </figure>
+                            <figure>
+                                <figcaption>
+                                    <span id="inspectionLabel">Grad-CAM overlay</span>
+                                    <span class="segmented" aria-label="Inspection layer">
+                                        <button class="is-active" type="button" data-image-mode="gradcam">Grad-CAM</button>
+                                        <button type="button" data-image-mode="processed">Processed</button>
+                                        <button type="button" data-image-mode="clahe">CLAHE</button>
+                                        <button type="button" data-image-mode="raw">Raw</button>
+                                    </span>
+                                </figcaption>
+                                <div class="image-frame"><img id="inspectionImage" src="logo.svg" alt="Selected model inspection image"></div>
+                            </figure>
                         </div>
 
-                        <!-- Drop Zone / Upload Area -->
-                        <div class="upload-dropzone" id="dropzone">
-                            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.tif,.tiff,image/png,image/jpeg,image/tiff" class="file-input-hidden">
-                            <div class="dropzone-content">
-                                <div class="upload-icon-wrapper">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="17 8 12 3 7 8"></polyline>
-                                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                                    </svg>
+                        <div class="result-layout">
+                            <section class="result-primary" aria-labelledby="outputHeading">
+                                <p class="context-label">Binary model output</p>
+                                <div class="result-title-row">
+                                    <h3 id="outputHeading">—</h3>
+                                    <strong id="confidenceValue">—</strong>
                                 </div>
-                                <h4 class="upload-title">Click or Drop Ultrasound Study Here</h4>
-                                <p class="upload-desc">PNG, JPG, and TIFF only &bull; maximum file size: 20 MB</p>
-                                <div class="button-row">
-                                    <button class="btn-primary" id="btnBrowse">Browse File</button>
-                                    <button class="btn-sample" id="btnLoadSample">⚡ Load Sample Scan</button>
+                                <p class="muted">Softmax score for the selected class; this is not clinical certainty.</p>
+                                <div class="probability-list">
+                                    <div>
+                                        <span><b>Benign</b><output id="benignValue">—</output></span>
+                                        <progress id="benignBar" aria-label="Benign softmax score" max="100" value="0">0%</progress>
+                                    </div>
+                                    <div>
+                                        <span><b>Malignant</b><output id="malignantValue">—</output></span>
+                                        <progress id="malignantBar" aria-label="Malignant softmax score" max="100" value="0">0%</progress>
+                                    </div>
                                 </div>
-                            </div>
+                            </section>
+
+                            <section class="descriptor-panel" aria-labelledby="descriptorHeading">
+                                <div class="panel-heading">
+                                    <h3 id="descriptorHeading">Exploratory image heuristics</h3>
+                                    <span class="status-badge">Research only</span>
+                                </div>
+                                <dl class="descriptor-grid">
+                                    <div><dt>Relative intensity</dt><dd id="descriptorEcho">—</dd></div>
+                                    <div><dt>Edge proxy</dt><dd id="descriptorMargin">—</dd></div>
+                                    <div><dt>Posterior intensity</dt><dd id="descriptorPosterior">—</dd></div>
+                                    <div><dt>Shape ratio</dt><dd id="descriptorOrientation">—</dd></div>
+                                </dl>
+                                <p id="resultRationale" class="research-note">No result loaded.</p>
+                            </section>
                         </div>
 
-                        <!-- Dual Image Display Area -->
-                        <div class="viewport-dual-grid hidden" id="viewportArea">
-                            <div class="view-box">
-                                <div class="box-label">Raw Ultrasound Study</div>
-                                <div class="img-container">
-                                    <div class="img-placeholder" id="phOriginal">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                                        <span>No Scan Loaded</span>
-                                    </div>
-                                    <img id="imgOriginal" src="" alt="" class="hidden">
-                                </div>
-                            </div>
-                            <div class="view-box highlight">
-                                <div class="box-label">Spotlight & 2.5X Zoom Lens View</div>
-                                <div class="img-container">
-                                    <div class="img-placeholder" id="phSpotlight">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                                        <span>Awaiting Inference</span>
-                                    </div>
-                                    <img id="imgSpotlight" src="" alt="" class="hidden">
-                                </div>
-                            </div>
+                        <section class="consensus-panel is-hidden" id="consensusPanel" aria-labelledby="consensusHeading">
+                            <div class="panel-heading"><h3 id="consensusHeading">Available-model comparison</h3><span id="consensusStatus" class="status-badge neutral">—</span></div>
+                            <div class="comparison-grid" id="comparisonGrid"></div>
+                            <p class="research-note">Agreement among models does not establish correctness. Missing or incompatible checkpoints are shown explicitly.</p>
+                        </section>
+                    </div>
+                </section>
+
+                <section class="view" id="view-noise" aria-labelledby="noiseHeading" hidden>
+                    <div class="section-intro">
+                        <div><h2 id="noiseHeading">Seeded perturbation experiment</h2><p>Compare one image before and after a reproducible synthetic perturbation. This is a demonstration, not a cohort robustness result.</p></div>
+                        <div class="button-row"><button class="button secondary" id="noiseSampleButton" type="button">Load labelled example</button><button class="button primary" id="runNoiseButton" type="button" disabled>Run experiment</button></div>
+                    </div>
+                    <div class="control-band">
+                        <label>Noise type<select id="noiseType"><option value="speckle">Speckle</option><option value="gaussian">Gaussian</option><option value="impulse">Impulse</option></select></label>
+                        <label>Intensity <output id="noiseIntensityValue">0.05</output><input id="noiseIntensity" type="range" min="0.01" max="0.15" step="0.01" value="0.05"></label>
+                        <label>Comparator<select id="noiseComparator"><option value="direct_resize">Direct resize</option><option value="center_crop">Centre crop</option></select></label>
+                        <label>Seed<input id="noiseSeed" type="number" value="42" min="0" max="999999"></label>
+                    </div>
+                    <div class="stage-grid" id="noiseStages">
+                        <article data-stage="stage1_clean"><header><span>Clean reference</span><strong>—</strong></header><div class="stage-image"><span>No run yet</span></div><dl><div><dt>Softmax score</dt><dd>—</dd></div><div><dt>SSIM</dt><dd>—</dd></div></dl></article>
+                        <article data-stage="stage2_noisy"><header><span>Perturbed image</span><strong>—</strong></header><div class="stage-image"><span>No run yet</span></div><dl><div><dt>Softmax score</dt><dd>—</dd></div><div><dt>SSIM</dt><dd>—</dd></div></dl></article>
+                        <article data-stage="stage3_direct"><header><span>Comparator</span><strong>—</strong></header><div class="stage-image"><span>No run yet</span></div><dl><div><dt>Softmax score</dt><dd>—</dd></div><div><dt>SSIM</dt><dd>—</dd></div></dl></article>
+                        <article data-stage="stage4_roi"><header><span>Square-pad path</span><strong>—</strong></header><div class="stage-image"><span>No run yet</span></div><dl><div><dt>Softmax score</dt><dd>—</dd></div><div><dt>SSIM</dt><dd>—</dd></div></dl></article>
+                    </div>
+                    <p class="research-note" id="noiseExplanation">Load an example to begin.</p>
+                </section>
+
+                <section class="view" id="view-batch" aria-labelledby="batchHeading" hidden>
+                    <div class="section-intro">
+                        <div><h2 id="batchHeading">Batch model evaluation</h2><p>Process multiple images or load a labelled folder sample. No clinical prioritisation is performed.</p></div>
+                        <div class="button-row">
+                            <label class="button primary" for="batchFiles">Choose images</label><input class="visually-hidden" id="batchFiles" type="file" multiple accept="image/png,image/jpeg,image/tiff">
+                            <button class="button secondary" id="loadCohortButton" type="button">Load labelled cohort</button>
+                            <button class="button quiet" id="exportBatchButton" type="button" disabled>Export CSV</button>
                         </div>
+                    </div>
+                    <div class="metric-row" id="batchMetrics">
+                        <dl><dt>Processed</dt><dd id="batchProcessed">0</dd></dl>
+                        <dl><dt>Benign output</dt><dd id="batchBenign">0</dd></dl>
+                        <dl><dt>Malignant output</dt><dd id="batchMalignant">0</dd></dl>
+                        <dl><dt>Mean softmax score</dt><dd id="batchConfidence">—</dd></dl>
+                    </div>
+                    <div class="table-toolbar"><label>Filter <select id="batchFilter"><option value="all">All outputs</option><option value="benign">Benign output</option><option value="malignant">Malignant output</option><option value="error">Errors</option></select></label></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Image</th><th>Known label</th><th>Model output</th><th>Softmax score</th><th>Score band</th><th>Status</th></tr></thead>
+                            <tbody id="batchBody"><tr><td colspan="6" class="empty-cell">No batch run yet.</td></tr></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="view" id="view-evidence" aria-labelledby="evidenceHeading" hidden>
+                    <div class="section-intro"><div><h2 id="evidenceHeading">Evidence record</h2><p>One generated evaluation record, presented together with its split-integrity limitations.</p></div><button class="button secondary" id="refreshEvidenceButton" type="button">Refresh files</button></div>
+                    <section class="audit-panel" aria-labelledby="auditHeading">
+                        <div class="panel-heading"><h3 id="auditHeading">Subject-level split audit</h3><span class="status-badge danger" id="auditBadge">Loading</span></div>
+                        <p id="auditDetail">Reading `outputs/data_audit.json`…</p>
+                        <div class="audit-grid" id="auditGrid"></div>
                     </section>
-
-                    <!-- Right Column: Diagnostic Verdict & Reports -->
-                    <section class="panel-card analytics-card">
-                        <div class="panel-header">
-                            <h3 class="panel-title">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
-                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                                </svg>
-                                Research classification result
-                            </h3>
-                        </div>
-
-                        <!-- Main Verdict Badge Card -->
-                        <div class="verdict-banner neutral" id="verdictBanner">
-                            <div class="verdict-main">
-                                <span class="verdict-caption">EXPERIMENTAL CLASSIFICATION</span>
-                                <h2 class="verdict-class" id="txtVerdict">AWAITING SCAN</h2>
-                            </div>
-                            <div class="verdict-confidence">
-                                <span class="confidence-val" id="txtConfidence">--%</span>
-                                <span class="confidence-lbl">Model confidence</span>
-                            </div>
-                        </div>
-
-                        <!-- Class Activation Probability Bars -->
-                        <div class="prob-section">
-                            <h4 class="sub-heading">Class Activation Distribution</h4>
-                            <div class="prob-bar-group">
-                                <div class="prob-label-row">
-                                    <span>Benign / Normal</span>
-                                    <span id="txtBenignProb">0.0%</span>
-                                </div>
-                                <div class="bar-track"><div class="bar-fill benign" id="barBenign" style="width: 0%"></div></div>
-                            </div>
-
-                            <div class="prob-bar-group">
-                                <div class="prob-label-row">
-                                    <span>Malignant</span>
-                                    <span id="txtMalignantProb">0.0%</span>
-                                </div>
-                                <div class="bar-track"><div class="bar-fill malignant" id="barMalignant" style="width: 0%"></div></div>
-                            </div>
-                        </div>
-
-                        <div class="report-section">
-                            <h4 class="sub-heading">Research context</h4>
-                            <div class="report-box" id="reportBox">
-                                <div class="report-item">
-                                    <span class="lbl">Loaded model:</span>
-                                    <span class="val highlight" id="txtModelName">--</span>
-                                </div>
-                                <div class="report-item">
-                                    <span class="lbl">Input noise profile:</span>
-                                    <span class="val" id="txtAcousticShadow">--</span>
-                                </div>
-                                <div class="report-rationale" id="txtRationale">
-                                    Experimental research output only. This interface does not provide diagnosis, BI-RADS assessment, risk estimates, or clinical advice.
-                                </div>
-                            </div>
-                        </div>
-                        <p class="research-notice" role="note">For academic demonstration only. Outputs are not for clinical use or patient care.</p>
-                    </section>
-                </div>
-            </main>
-
-            <!-- CANVAS VIEW 2: ACOUSTIC NOISE LABORATORY (UNIFORM 4-COLUMN SUITE) -->
-            <main id="viewNoiseLab" class="view-panel">
-                <div class="noise-lab-container">
-                    <div class="noise-lab-header">
-                        <h3 class="panel-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
-                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                            </svg>
-                            Acoustic Noise & Resizing Solution Analysis Matrix
-                        </h3>
-                        <button class="btn-primary" id="btnSimulateNoise">⚡ Execute 4-Stage Comparative Analysis</button>
+                    <div class="metric-row evidence-metrics">
+                        <dl><dt>Images evaluated</dt><dd id="metricSamples">—</dd></dl>
+                        <dl><dt>Accuracy</dt><dd id="metricAccuracy">—</dd></dl>
+                        <dl><dt>Macro F1</dt><dd id="metricF1">—</dd></dl>
+                        <dl><dt>ROC-AUC</dt><dd id="metricAuc">—</dd></dl>
                     </div>
-
-                    <!-- 4 Interactive Columns Grid (Uniform Full Height Spanning) -->
-                    <div class="noise-4col-grid">
-                        <!-- COLUMN 1: DATASET & SCAN ACQUISITION -->
-                        <div class="panel-card col-card">
-                            <div class="col-top">
-                                <div class="col-header">
-                                    <span class="col-num">COL 1</span>
-                                    <h4 class="col-title">Dataset & Acquisition</h4>
-                                </div>
-                                <div class="control-group mt-2">
-                                    <label class="control-label">Select Dataset</label>
-                                    <select id="selectNoiseDataset" class="glass-select">
-                                        <option value="busi" selected>BUSI Dataset</option>
-                                        <option value="oasbud">OASBUD Dataset</option>
-                                        <option value="breast">BrEaST Dataset</option>
-                                    </select>
-                                </div>
-                                <div class="control-group mt-2">
-                                    <button class="btn-sample full-width" id="btnNoiseLoadSample">⚡ Load Sample Scan</button>
-                                </div>
-                                <div class="view-box mt-3">
-                                    <div class="box-label">Raw Clean Scan</div>
-                                    <div class="img-container">
-                                        <div class="img-placeholder" id="phCol1">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                                            <span>No Scan Loaded</span>
-                                        </div>
-                                        <img id="imgCol1Clean" src="" alt="" class="hidden">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="verdict-mini-card neutral mt-2" id="cardCol1Verdict">
-                                <span class="v-label">Stage 1: Clean classification</span>
-                                <span class="v-pred" id="txtCol1Pred">AWAITING SCAN</span>
-                                <span class="v-conf" id="txtCol1Conf">--%</span>
-                            </div>
-                        </div>
-
-                        <!-- COLUMN 2: SYNTHETIC NOISE GENERATOR -->
-                        <div class="panel-card col-card">
-                            <div class="col-top">
-                                <div class="col-header">
-                                    <span class="col-num">COL 2</span>
-                                    <h4 class="col-title">Synthetic Noise Generator</h4>
-                                </div>
-                                <div class="control-group mt-2">
-                                    <label class="control-label">Noise Profile Type</label>
-                                    <select id="selectNoiseType" class="glass-select">
-                                        <option value="speckle" selected>Speckle (Acoustic Scatter)</option>
-                                        <option value="gaussian">Gaussian (Sensor Noise)</option>
-                                        <option value="impulse">Impulse (Salt & Pepper)</option>
-                                    </select>
-                                </div>
-                                <div class="control-group mt-2">
-                                    <div class="slider-header">
-                                        <label class="control-label">Intensity ($\sigma$)</label>
-                                        <span id="lblIntensityVal" class="slider-val">0.05</span>
-                                    </div>
-                                    <input type="range" id="rangeIntensity" min="0.01" max="0.15" step="0.01" value="0.05" class="glass-range">
-                                </div>
-                                <div class="view-box alert mt-3">
-                                    <div class="box-label">Noisy Uncropped Scan</div>
-                                    <div class="img-container">
-                                        <div class="img-placeholder" id="phCol2">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                            <span>No Noise Active</span>
-                                        </div>
-                                        <img id="imgCol2Noisy" src="" alt="" class="hidden">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="verdict-mini-card neutral mt-2" id="cardCol2Verdict">
-                                <span class="v-label">Stage 2: Noisy classification</span>
-                                <span class="v-pred" id="txtCol2Pred">AWAITING SCAN</span>
-                                <span class="v-conf" id="txtCol2Conf">--%</span>
-                            </div>
-                        </div>
-
-                        <!-- COLUMN 3: RESIZING SOLUTION A (INTERACTIVE STRATEGY SELECTOR) -->
-                        <div class="panel-card col-card">
-                            <div class="col-top">
-                                <div class="col-header">
-                                    <span class="col-num">COL 3</span>
-                                    <h4 class="col-title">Resizing Solution A</h4>
-                                </div>
-                                <div class="control-group mt-2">
-                                    <label for="selectCol3Strategy" class="control-label">Resizing Methodology</label>
-                                    <select id="selectCol3Strategy" class="glass-select">
-                                        <option value="direct_resize" selected>📐 Direct Resize (Anamorphic)</option>
-                                        <option value="center_crop">🔳 Center Crop (PyTorch Default)</option>
-                                        <option value="roi_crop">🎯 ROI Crop (Padded Square)</option>
-                                    </select>
-                                </div>
-                                <div class="view-box mt-3">
-                                    <div class="box-label" id="lblCol3Box">Solution A Processed Tensor</div>
-                                    <div class="img-container">
-                                        <div class="img-placeholder" id="phCol3">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
-                                            <span>No Tensor Processed</span>
-                                        </div>
-                                        <img id="imgCol3Direct" src="" alt="" class="hidden">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="verdict-mini-card neutral mt-2" id="cardCol3Verdict">
-                                <span class="v-label">Stage 3: Method A classification</span>
-                                <span class="v-pred" id="txtCol3Pred">AWAITING SCAN</span>
-                                <span class="v-conf" id="txtCol3Conf">--%</span>
-                            </div>
-                        </div>
-
-                        <!-- COLUMN 4: RESIZING SOLUTION B (INTERACTIVE STRATEGY SELECTOR) -->
-                        <div class="panel-card col-card highlight">
-                            <div class="col-top">
-                                <div class="col-header">
-                                    <span class="col-num highlight">COL 4</span>
-                                    <h4 class="col-title">Proposed Solution B</h4>
-                                </div>
-                                <div class="control-group mt-2">
-                                    <span class="control-label">Fixed proposed methodology</span>
-                                    <span class="model-chip">ROI crop + reflection padding</span>
-                                </div>
-                                <div class="view-box highlight mt-3">
-                                    <div class="box-label" id="lblCol4Box">Proposed Solution B Tensor</div>
-                                    <div class="img-container">
-                                        <div class="img-placeholder" id="phCol4">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8m-4-4h8"/></svg>
-                                            <span>No Solution Active</span>
-                                        </div>
-                                        <img id="imgCol4Roi" src="" alt="" class="hidden">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="verdict-mini-card neutral mt-2" id="cardCol4Verdict">
-                                <span class="v-label">Stage 4: Method B classification</span>
-                                <span class="v-pred" id="txtCol4Pred">AWAITING SCAN</span>
-                                <span class="v-conf" id="txtCol4Conf">--%</span>
-                            </div>
-                        </div>
+                    <p class="research-note" id="metricsProvenance">Metrics not loaded.</p>
+                    <div class="evidence-figures">
+                        <figure><figcaption>Generated confusion matrix</figcaption><img id="confusionImage" src="/api/evidence/confusion_matrix.png" alt="Generated confusion matrix for the provisional checkpoint evaluation"></figure>
+                        <figure><figcaption>Generated receiver operating characteristic</figcaption><img id="rocImage" src="/api/evidence/roc_curve.png" alt="Generated ROC curve for the provisional checkpoint evaluation"></figure>
                     </div>
+                    <div class="unavailable-panel"><h3>Not available as measured evidence</h3><ul id="unavailableList"><li>Loading…</li></ul></div>
+                </section>
 
-                    <!-- Comparative Explanation Footer -->
-                    <div class="explanation-box mt-3" id="txtNoiseExplanation">
-                        Controlled experiment: the same seeded noise realization is used in columns 2–4. Percentages are the selected model’s observed softmax confidence, not adjusted scores.
+                <section class="view" id="view-dataset" aria-labelledby="datasetHeading" hidden>
+                    <div class="section-intro"><div><h2 id="datasetHeading">Local dataset explorer</h2><p>Inspect folder labels and images. Folder membership does not certify subject independence.</p></div></div>
+                    <div class="control-band compact">
+                        <label>Dataset<select id="datasetSelect"><option value="busi">BUSI</option><option value="oasbud">OASBUD</option><option value="breast">BrEaST</option></select></label>
+                        <label>Partition<select id="splitSelect"><option value="train">Training</option><option value="val">Validation</option><option value="test">Test</option></select></label>
                     </div>
-                </div>
-            </main>
+                    <p class="dataset-summary" id="datasetSummary" aria-live="polite"></p>
+                    <div class="dataset-grid" id="datasetGrid" aria-live="polite"><p class="empty-state">Select a dataset and partition.</p></div>
+                </section>
 
-            <!-- CANVAS VIEW 3: DATASET EXPLORER -->
-            <main id="viewDataset" class="view-panel">
-                <div class="panel-card full-panel">
-                    <div class="panel-header">
-                        <h3 class="panel-title">Validation Dataset Partition Explorer</h3>
-                        <div class="dataset-selectors">
-                            <select id="selectDataset" class="glass-select">
-                                <option value="busi" selected>BUSI Dataset (Breast Ultrasound Image)</option>
-                                <option value="oasbud">OASBUD Dataset</option>
-                                <option value="breast">BrEaST Dataset</option>
-                            </select>
-                            <select id="selectSplit" class="glass-select">
-                                <option value="val" selected>Validation Partition</option>
-                                <option value="test">Test Partition</option>
-                                <option value="train">Train Partition</option>
-                            </select>
-                        </div>
+                <section class="view" id="view-documentation" aria-labelledby="documentationHeading" hidden>
+                    <div class="section-intro"><div><h2 id="documentationHeading">Documentation reader</h2><p>Submission-facing Markdown and methodology notes served directly from the repository.</p></div></div>
+                    <div class="document-layout">
+                        <nav class="document-list" aria-label="Available documents">
+                            <button type="button" data-document="DISSERTATION.md">Dissertation summary</button>
+                            <button type="button" data-document="RESULTS_STATUS.md">Results status</button>
+                            <button type="button" data-document="USER_MANUAL.md">User manual</button>
+                            <button type="button" data-document="Chapter_3_Methodology.md">Methodology chapter</button>
+                            <button type="button" data-document="TABLE_INTERPRETATION_AND_METHODOLOGY_GUIDE.md">Evidence-table guide</button>
+                            <button type="button" data-document="IMAGE_RESIZING_AND_CROPPING_NOISE_ANALYSIS.md">Ablation protocol</button>
+                        </nav>
+                        <article class="markdown-body" id="documentViewer"><p>Choose a document.</p></article>
                     </div>
-                    <div class="dataset-grid" id="datasetGrid">
-                        <!-- Dynamic Dataset File Cards -->
-                    </div>
-                </div>
-            </main>
-
-            <!-- CANVAS VIEW 4: THESIS & RESEARCH READER -->
-            <main id="viewThesis" class="view-panel">
-                <div class="thesis-layout">
-                    <div class="panel-card thesis-sidebar-card">
-                        <h3 class="panel-title">MSc Dissertation Documents</h3>
-                        <ul class="doc-list" id="docList">
-                            <li class="doc-item active" data-file="IMAGE_RESIZING_AND_CROPPING_NOISE_ANALYSIS.md">🔬 Resizing, Cropping & Noise Analysis</li>
-                            <li class="doc-item" data-file="DISSERTATION.md">📄 Master Dissertation Thesis</li>
-                            <li class="doc-item" data-file="USER_MANUAL.md">📖 User & System Operating Manual</li>
-                            <li class="doc-item" data-file="Chapter_1_Introduction.md">1️⃣ Chapter 1: Introduction</li>
-                            <li class="doc-item" data-file="Chapter_2_Literature_Review.md">2️⃣ Chapter 2: Literature Review</li>
-                            <li class="doc-item" data-file="Chapter_3_Methodology.md">3️⃣ Chapter 3: Methodology</li>
-                            <li class="doc-item" data-file="Chapter_4_Implementation_And_Training.md">4️⃣ Chapter 4: Implementation</li>
-                            <li class="doc-item" data-file="Chapter_5_Results_And_Evaluation.md">5️⃣ Chapter 5: Results & Evaluation</li>
-                            <li class="doc-item" data-file="Chapter_6_Discussion_And_Conclusion.md">6️⃣ Chapter 6: Conclusion</li>
-                        </ul>
-                    </div>
-
-                    <div class="panel-card thesis-content-card">
-                        <div class="markdown-body" id="markdownViewer">
-                            <p class="placeholder-text">Loading thesis documentation...</p>
-                        </div>
-                    </div>
-                </div>
+                </section>
             </main>
         </div>
     </div>
 
-    <!-- NON-BREAST ULTRASOUND REJECTION MODAL -->
-    <div id="modalRejection" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalRejectionTitle">
-        <div class="modal-card">
-            <button id="btnModalClose" class="modal-close-btn" aria-label="Close alert">&times;</button>
-            <div class="modal-icon-wrapper">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="modal-warning-icon">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-            </div>
-            <h3 id="modalRejectionTitle" class="modal-title">Invalid Image Upload Detected</h3>
-            <div class="modal-body-box">
-                <p id="modalRejectionMessage" class="modal-message-text">
-                    NON_BREAST_ULTRASOUND: Please put in an actual breast cancer scan. The uploaded file is a natural color photo rather than a B-mode breast ultrasound study.
-                </p>
-            </div>
-            <div class="modal-action-row">
-                <button id="btnModalDismiss" class="btn-primary modal-action-btn">📂 Upload Valid Breast Ultrasound Scan</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js?v=17"></script>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <dialog id="errorDialog">
+        <form method="dialog">
+            <h2>Image could not be processed</h2>
+            <p id="errorDialogMessage">Choose another supported image and try again.</p>
+            <button class="button primary" value="close">Close</button>
+        </form>
+    </dialog>
+    <script src="script.js?v=20260907c"></script>
 </body>
 </html>

@@ -68,3 +68,16 @@ env/
 data/
 outputs/
 *model*.pth
+
+# Reproducible QA/build intermediates (final submission artifacts remain tracked)
+.qa/
+.chart-data-*/
+latex/tmp/
+latex/*.aux
+latex/*.bbl
+latex/*.blg
+latex/*.lof
+latex/*.log
+latex/*.lot
+latex/*.out
+latex/*.toc

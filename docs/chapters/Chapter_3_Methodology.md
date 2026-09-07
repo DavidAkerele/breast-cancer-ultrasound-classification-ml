@@ -1,34 +1,31 @@
 # Chapter 3: Methodology
 
-## 3.1 Preprocessing: CLAHE Optimization
-Contrast Limited Adaptive Histogram Equalization (CLAHE) [Zuiderveld, 1994] addresses the limitations of standard Global Histogram Equalization (GHE) by operating on localized regions (tiles) and clipping contrast amplification:
-1. **Tiling:** The luminance plane is split into a grid of $16 \times 16$ contextual tiles.
-2. **Clipping:** For each tile, the histogram is computed and clipped at a threshold ($\beta = 2.0$). Surplus bins are redistributed uniformly across gray levels.
-3. **Equalization:** The cumulative distribution function (CDF) is mapped for local pixel values:
-   $$P(k) = \frac{1}{M \cdot N} \sum_{j=0}^k h_{\text{clipped}}(j)$$
-4. **Interpolation:** Bilinear interpolation is applied across tile boundaries to eliminate artificial boundary edges.
+## 3.1 Evidence design
 
-## 3.2 Proposed ROI Reflection Square Padding Formulation
-Given an input scan $I$ and lesion mask $M$, bounding box extrema $(x_{\min}, y_{\min}, x_{\max}, y_{\max})$ are extracted. A 20% margin ratio ($\alpha = 0.20$) is added:
-$$y_1 = \max(0, y_{\min} - \alpha \cdot h_{box}), \quad y_2 = \min(H, y_{\max} + \alpha \cdot h_{box})$$
-$$x_1 = \max(0, x_{\min} - \alpha \cdot w_{box}), \quad x_2 = \min(W, x_{\max} + \alpha \cdot w_{box})$$
+The project distinguishes **engineering evidence**, which confirms that the software path executes consistently, from **generalisation evidence**, which estimates performance on independent subjects. The current local cohort supports only the first level because it fails the split-integrity audit.
 
-To convert the cropped matrix $I_{\text{crop}} \in \mathbb{R}^{h_c \times w_c}$ into a square tensor without aspect ratio distortion, the maximum dimension $d_{\max} = \max(h_c, w_c)$ is computed. Symmetric reflection boundary padding is applied:
-$$pad_{\text{top}} = \lfloor (d_{\max} - h_c)/2 \rfloor, \quad pad_{\text{bottom}} = d_{\max} - h_c - pad_{\text{top}}$$
-$$pad_{\text{left}} = \lfloor (d_{\max} - w_c)/2 \rfloor, \quad pad_{\text{right}} = d_{\max} - w_c - pad_{\text{left}}$$
+## 3.2 Data audit
 
-Boundary pixels are mirrored using reflection padding (`BORDER_REFLECT_101`), preventing sharp edge gradient spikes. The padded square tensor is resized to $224 \times 224$ using bicubic interpolation ($s_x = s_y \implies \mathcal{AR} = 0.0\%$).
+The combined loader currently finds 402 training, 107 validation, and 120 test images. OASBUD subject `30nh` spans training and validation; BrEaST cases `case140` and `case151` span partitions; and BUSI patient separation cannot be reconstructed from the renamed files. Training therefore stops by default unless `--allow-unaudited-data` is supplied for an explicitly provisional run.
 
-## 3.3 Deep Learning Architectures
-1. **EfficientNet-B0 (5.3M parameters):** Employs compound scaling with Mobile Inverted Bottleneck (MBConv) blocks and Squeeze-and-Excitation (SE) channel attention [Tan & Le, 2019, Hu et al., 2018].
-2. **ResNet-50 (25.6M parameters):** 50-layer deep residual network utilizing bottleneck residual units with identity shortcut mappings [He et al., 2016].
-3. **Custom 4-Block CNN Baseline (1.2M parameters):** 4 Conv blocks ($32 \rightarrow 64 \rightarrow 128 \rightarrow 256$ filters), Batch Normalization, ReLU, $2 \times 2$ Max Pooling, Adaptive Average Pooling, and Dropout ($p=0.5$).
+The subject-level splitter copies grouped files into deterministic class-stratified partitions and saves a JSON manifest. It never moves the source dataset.
 
-## 3.4 Classification Constraints (Softmax Exclusivity)
-A clinical diagnosis must be mutually exclusive. An ultrasound scan is classified as either benign or malignant. We enforce this constraint using a Softmax activation on logits $\mathbf{z}$:
-$$P(Y = c \mid \mathbf{x}) = \frac{\exp(z_c)}{\sum_{j=1}^K \exp(z_j)}, \quad \text{such that } \sum_{c=1}^K P(Y = c \mid \mathbf{x}) \equiv 1.000$$
+## 3.3 Shared preprocessing
 
-## 3.5 Synthetic Acoustic Noise Simulation Engine
-- **Rayleigh Speckle Noise:** $I_{\text{speckle}}(x, y) = I(x, y) + I(x, y) \cdot \eta_m(x, y)$, where $\eta_m \sim \mathcal{N}(0, \sigma^2)$ for $\sigma \in [0.01, 0.15]$.
-- **Gaussian Thermal Noise:** $I_{\text{gaussian}}(x, y) = I(x, y) + \eta_a(x, y)$, where $\eta_a \sim \mathcal{N}(0, \sigma_g^2)$.
-- **Impulse Noise:** $P(I=0) = p/2$, $P(I=255) = p/2$ for ADC transmission dropout simulation.
+All executable surfaces call the same function. The sequence is RGB decoding, optional CLAHE, one selected crop/resize strategy, tensor conversion, and ImageNet normalisation.
+
+Supported masks end with `_mask.png`, `_tumor.png`, or `_lesion_mask.png`. A valid mask defines a bounding box expanded by a 20% context margin. Without a mask, the central 80% is used as a deterministic fallback. For a crop of height $h_c$ and width $w_c$, the square side is $d=\max(h_c,w_c)$; symmetric `BORDER_REFLECT_101` padding is added and the result is resized to $224\times224$.
+
+Training augmentation uses horizontal flips and rotations up to 15 degrees. Vertical flips are excluded because image depth has acquisition meaning.
+
+## 3.4 Models and optimisation
+
+EfficientNet-B0 and ResNet-50 use ImageNet initialisation during training; the custom CNN is trained from scratch. The default optimiser is AdamW with learning rate $10^{-4}$ and weight decay $10^{-4}$, cosine annealing, class-weighted cross-entropy, batch size 16, and early stopping. Python, NumPy, PyTorch, and CUDA are seeded; each checkpoint stores its run configuration and audit status.
+
+## 3.5 Evaluation artifacts
+
+`evaluate.py` writes `predictions.csv`, `metrics.json`, `confusion_matrix.png`, and `roc_curve.png`. The JSON record includes audit status and checksum, generation time, preprocessing configuration, sample count, summary metrics, and confusion matrix. Tables are generated from these outputs rather than entered manually.
+
+## 3.6 Interface boundary
+
+The FastAPI interface exposes research inference, model comparison where compatible checkpoints exist, batch evaluation, and seeded synthetic-noise demonstrations. It does not infer ground truth from filenames or provide diagnosis, BI-RADS, clinical priority, or management advice.

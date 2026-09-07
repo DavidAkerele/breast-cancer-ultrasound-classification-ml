@@ -40,8 +40,8 @@ def crop_and_pad_roi(img_np: np.ndarray, mask_np: np.ndarray = None, margin_rati
     if mask_np is not None and np.any(mask_np > 0):
         gray_mask = cv2.cvtColor(mask_np, cv2.COLOR_RGB2GRAY) if len(mask_np.shape) == 3 else mask_np
         y_indices, x_indices = np.where(gray_mask > 0)
-        x1, x2 = np.min(x_indices), np.max(x_indices)
-        y1, y2 = np.min(y_indices), np.max(y_indices)
+        x1, x2 = np.min(x_indices), np.max(x_indices) + 1
+        y1, y2 = np.min(y_indices), np.max(y_indices) + 1
     else:
         # For unmasked scans, restrict to the central 80% tissue region where masses reside
         h_start, h_end = int(h * 0.10), int(h * 0.90)
@@ -72,6 +72,33 @@ def crop_and_pad_roi(img_np: np.ndarray, mask_np: np.ndarray = None, margin_rati
     
     padded = cv2.copyMakeBorder(crop, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_REFLECT_101)
     return cv2.resize(padded, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
+
+
+def find_mask_path(filepath: str):
+    """Return a paired lesion mask from a supported dataset, if present."""
+    stem, _ = os.path.splitext(filepath)
+    for suffix in ("_mask.png", "_tumor.png", "_lesion_mask.png"):
+        candidate = stem + suffix
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def preprocess_image(img_np, use_clahe=True, crop_strategy=None, mask_np=None):
+    """Shared preparation for training, evaluation, CLI, and API inference."""
+    strategy = crop_strategy or config.CROP_STRATEGY
+    if use_clahe and config.USE_CLAHE:
+        img_np = apply_clahe(img_np)
+    if strategy == "roi_crop":
+        return crop_and_pad_roi(img_np, mask_np)
+    if strategy == "direct_resize":
+        return cv2.resize(img_np, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
+    if strategy == "center_crop":
+        h, w = img_np.shape[:2]
+        side = min(h, w)
+        y, x = (h - side) // 2, (w - side) // 2
+        return cv2.resize(img_np[y:y + side, x:x + side], (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
+    raise ValueError(f"Unsupported crop strategy: {strategy}")
 
 class BreastUltrasoundDataset(Dataset):
     """
@@ -107,7 +134,7 @@ class BreastUltrasoundDataset(Dataset):
                             
                 for filepath in sorted(files):
                     fname = os.path.basename(filepath)
-                    if not fname.lower().endswith(('_tumor.png', '_mask.png')):
+                    if not fname.lower().endswith(('_tumor.png', '_mask.png', '_lesion_mask.png')):
                         self.samples.append((filepath, class_idx))
 
     def __len__(self):
@@ -125,20 +152,9 @@ class BreastUltrasoundDataset(Dataset):
             img_pil = Image.open(filepath).convert("RGB")
             img_np = np.array(img_pil)
 
-        # Apply CLAHE enhancement if enabled
-        if self.use_clahe and config.USE_CLAHE:
-            img_np = apply_clahe(img_np)
-
-        # Apply cropping strategy
-        if self.crop_strategy == "roi_crop":
-            # Look for mask file if available
-            mask_path = filepath.rsplit('.', 1)[0] + "_mask.png"
-            mask_np = None
-            if os.path.exists(mask_path):
-                mask_np = cv2.imread(mask_path)
-            img_np = crop_and_pad_roi(img_np, mask_np)
-        elif self.crop_strategy == "direct_resize":
-            img_np = cv2.resize(img_np, (config.IMG_SIZE, config.IMG_SIZE), interpolation=cv2.INTER_CUBIC)
+        mask_path = find_mask_path(filepath) if self.crop_strategy == "roi_crop" else None
+        mask_np = cv2.imread(mask_path) if mask_path else None
+        img_np = preprocess_image(img_np, self.use_clahe, self.crop_strategy, mask_np)
 
         img = Image.fromarray(img_np)
 
@@ -157,7 +173,7 @@ def get_transforms():
         transforms.Resize(config.IMG_SIZE),
         transforms.CenterCrop(config.IMG_SIZE),
         transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomVerticalFlip(p=0.5),
+        # Do not vertically flip ultrasound: image depth has anatomical meaning.
         transforms.RandomRotation(degrees=15),
         transforms.ToTensor(),
         # Standard ImageNet normalization values required for ResNet/EfficientNet

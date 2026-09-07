@@ -1,51 +1,33 @@
 # Chapter 1: Introduction
 
-## 1.1 Clinical Background and Epidemiological Context
-Breast cancer represents one of the most formidable global health challenges of the modern era, ranking as the most commonly diagnosed malignancy and a leading contributor to cancer-related mortality among women worldwide [Sung et al., 2021]. According to the World Health Organization (WHO) and GLOBOCAN statistics, female breast cancer accounts for approximately 2.3 million new diagnoses annually, representing nearly 11.7% of all global cancer cases [Sung et al., 2021]. In oncological practice, clinical prognosis and long-term overall survival rates correlate directly with early detection: identifying neoplastic lesions at stage 0 (carcinoma in situ) or stage I yields a 5-year relative survival rate exceeding 99%, whereas diagnosis at stage IV drops 5-year survival precipitously below 30% [Shen et al., 2019].
+## 1.1 Background
 
-To achieve early intervention, healthcare infrastructures rely upon systematic radiological screening modalities. Full-Field Digital Mammography (FFDM) serves as the primary population-wide screening standard; however, mammographic sensitivity degrades significantly in patients presenting with dense fibroglandular breast parenchyma (American College of Radiology BI-RADS density categories C and D) [Shen et al., 2019, Mendelson et al., 2013]. In dense tissue, high-attenuation fibroglandular tissue visually overlaps and occludes microcalcifications and small solid tumors, causing mammographic sensitivity to plummet from over 85% in fatty breasts down to under 50% in extremely dense breasts [Mendelson et al., 2013].
+Breast ultrasound is a non-ionising imaging modality used alongside clinical assessment and other imaging. Its appearance varies with equipment, acquisition settings, anatomy, and operator technique. These differences, together with speckle and limited public sample sizes, make automated image classification a useful but difficult research problem.
 
-Medical Breast Ultrasound (BUS) has emerged as an indispensable complementary diagnostic imaging modality, serving as the frontline screening tool for younger cohorts, pregnant patients, and women with dense breast tissue [Al-Dhabyani et al., 2020]. Operating without ionizing radiation, breast sonography utilizes high-frequency acoustic waves (typically 7 to 15 MHz) to achieve real-time, high-contrast visualization of soft-tissue interfaces [Sikhakhane et al., 2024]. It provides vital diagnostic differentiation between benign fluid-filled simple cysts and solid neoplastic masses, whilst enabling real-time ultrasound-guided needle biopsies [Stavros et al., 1995].
+Convolutional neural networks can learn image representations directly from pixels, while transfer learning can reduce the amount of task-specific data required. Nevertheless, a polished model result is not automatically a valid generalisation estimate. Related images from the same subject must remain in one partition, and the complete route from preprocessing to reported tables must be reproducible.
 
-## 1.2 Challenges in Clinical Ultrasonography
-Despite its extensive diagnostic utility, the clinical efficacy of breast ultrasound is intrinsically constrained by two major operational vulnerabilities:
-1. **Acoustic Speckle Noise and Low Contrast:** Due to the physical wave mechanics of ultrasound propagation through heterogeneous biological parenchyma, sonograms are heavily corrupted by multiplicative acoustic speckle noise [Sikhakhane et al., 2024]. The superposition of backscattered acoustic waves from cellular microstructures produces granular, signal-dependent intensity fluctuations that blur delicate lesion boundaries, mask subtle acoustic shadowing, and reduce the effective Contrast-to-Noise Ratio (CNR) [Jiang et al., 2023].
-2. **Inter-Observer Variability and Cognitive Fatigue:** Sonographic examination is operator-dependent and involves subjective real-time visual interpretation. Studies indicate inter-radiologist disagreement rates of up to 30% when evaluating subtle morphological margin characteristics (such as microlobulation or angular margins) [Litjens et al., 2017]. High clinical workloads and cognitive fatigue exacerbate the risk of false positives (triggering unnecessary benign tissue biopsies and patient anxiety) and false negatives (delaying critical therapeutic intervention) [Kelly et al., 2019].
+This dissertation develops a binary breast-ultrasound classification prototype with shared preprocessing, three CNN backbones, auditable evaluation outputs, and a local web interface. It is research software, not a diagnostic or clinical decision-support system.
 
-## 1.3 Emergence of Deep Learning in Sonography
-Early CAD architectures deployed in the 1990s and 2000s relied on hand-engineered mathematical feature extractors, such as Gray-Level Co-occurrence Matrices (GLCM), Gabor texture filter banks, and boundary-tracking active contour models paired with classical classifiers such as Support Vector Machines (SVMs) [Cheng et al., 2016]. While foundational, these classical systems exhibited acute brittleness, frequently generating high false-positive rates when confronted with varying scanner gain settings and acoustic shadowing artifacts [Drukker et al., 2002].
+## 1.2 Research problem
 
-The advent of Deep Convolutional Neural Networks (CNNs) has fundamentally reshaped medical image computing [Litjens et al., 2017]. Rather than relying on human-engineered heuristic descriptors, deep neural networks autonomously learn hierarchical spatial representations directly from raw acoustic pixel matrices [He et al., 2016]. Early convolutional kernels detect fundamental low-level primitives (such as acoustic edges, gradients, and echogenic boundaries), while deeper residual blocks synthesize complex high-level diagnostic representations corresponding to clinical BI-RADS descriptors (including posterior acoustic attenuation, boundary spiculation, and hypoechoic tissue invasion) [He et al., 2016, Mendelson et al., 2013]. Through transfer learning on massive visual repositories (such as ImageNet), deep CNN backbones (e.g., ResNet-50 and EfficientNet-B0) can generalize effectively across biomedical domains, overcoming the clinical scarcity of large-scale annotated ultrasound training sets [Tan & Le, 2019, Al-Dhabyani et al., 2020].
+The project addresses three connected issues:
 
-## 1.4 Problem Statement and Theoretical Motivation
-Despite remarkable empirical achievements on curated public benchmarks, the translation of deep learning ultrasound classifiers into uncurated clinical environments remains obstructed by two fundamental technical failures:
-1. **Vulnerability to Out-of-Distribution Acoustic Noise:** Deep learning models are mathematically optimized under the assumption that training and deployment data are drawn from identical underlying statistical distributions. When models trained on pristine or heavily filtered scans encounter real-world acoustic noise, standard pooling layers (e.g., Max Pooling) propagate peak noise spikes through hidden activations [Jiang et al., 2023]. This corrupts the latent feature manifold, leading to catastrophic prediction errors and severe overconfidence on corrupted inputs.
-2. **Geometric Aspect Ratio Distortion in Standard Preprocessing:** Modern convolutional backbones require fixed square input tensors (typically $224 \times 224 \times 3$). Standard deep learning data loaders routinely apply direct anamorphic resizing to rectangular raw scans ($700 \times 500$ pixels). This non-uniform spatial scaling squishes the image, introducing an average geometric distortion error of $\mathcal{AR} = +38.5\%$. In clinical oncology, the ratio of lesion height to width ($H/W$) is a cardinal BI-RADS biomarker: malignant masses grow vertically across anatomical tissue planes yielding "taller-than-wide" shapes ($H/W > 1.0$), whereas benign fibroadenomas orient horizontally ($H/W < 1.0$) [Stavros et al., 1995, Mendelson et al., 2013]. Direct anamorphic resizing artificially flattens taller-than-wide malignant tumors into squished, oval profiles, misleading convolutional spatial feature extractors and degrading diagnostic accuracy.
+1. **Pipeline consistency:** training, evaluation, command-line prediction, and API inference must apply the same preprocessing rules.
+2. **Geometric preprocessing:** direct rectangular-to-square resize changes apparent aspect ratios; padding permits isotropic resize, but any predictive benefit must be measured.
+3. **Evidence integrity:** subject identifiers, split manifests, seeds, configuration, checkpoints, and per-image predictions are necessary to support a defensible result.
 
-## 1.5 Research Questions and Formal Hypotheses
-- **Research Question 1 ($RQ_1$):** To what extent does multiplicative Rayleigh speckle noise degrade the classification accuracy, sensitivity, and latent feature stability of deep convolutional backbones in breast ultrasound diagnostics?
-  - *Hypothesis 1 ($H_1$):* Multiplicative acoustic speckle noise degrades model classification performance non-linearly, with uncropped anamorphic architectures experiencing accuracy drops exceeding 30% under severe noise ($\sigma \ge 0.10$) due to peak noise propagation across spatial pooling layers.
-- **Research Question 2 ($RQ_2$):** Does enforcing an isotropic square aspect ratio ($H/W = 1.0$) via Region of Interest (ROI) reflection boundary padding eliminate geometric distortion and improve malignant tumor detection sensitivity?
-  - *Hypothesis 2 ($H_2$):* Proposed ROI cropping with symmetric reflection square padding will reduce geometric aspect ratio distortion error to $\mathcal{AR} = 0.0\%$, preserving vertical malignant margin features and boosting diagnostic sensitivity above 95%.
-- **Research Question 3 ($RQ_3$):** Can biophysical contrast enhancement (CLAHE) combined with pre-trained Mobile Inverted Bottleneck convolutions (EfficientNet-B0) provide superior noise resilience compared to deeper residual networks (ResNet-50) and unpadded baselines?
-  - *Hypothesis 3 ($H_3$):* Localized CLAHE contrast redistribution paired with squeeze-and-excitation channel attention in EfficientNet-B0 will elevate Contrast-to-Noise Ratios ($\text{CNR}$) by over 100% and sustain test classification accuracy above 90% even under severe acoustic degradation ($\sigma = 0.15$).
+The supplied local data currently fails the third requirement. Identifiable OASBUD and BrEaST subjects occur across splits, and renamed BUSI files do not preserve enough provenance to verify patient separation. Current metrics are therefore provisional engineering evidence only.
 
-## 1.6 Project Aims and Technical Objectives
-The central aim of this Master's dissertation is to develop, evaluate, and critically analyze a robust, noise-resilient computer-aided diagnosis framework for automated breast ultrasound classification across multi-center clinical repositories.
+## 1.3 Research questions
 
-Specific technical objectives include:
-1. Conduct an exhaustive survey of acoustic physics, multiplicative noise, BI-RADS clinical descriptors, and deep transfer learning.
-2. Curate and stratify multi-center benchmark datasets (**BUSI**, **OASBUD**, **BrEaST**) into 70/15/15 train/val/test splits.
-3. Formulate the Proposed ROI Reflection Square Padding algorithm to eliminate geometric distortion ($\mathcal{AR} = 0.0\%$).
-4. Implement localized CLAHE for hypoechoic margin contrast enhancement.
-5. Develop a multi-tier synthetic acoustic noise simulation engine ($\sigma \in [0.01, 0.15]$).
-6. Train and fine-tune deep CNN backbones (EfficientNet-B0, ResNet-50, Custom CNN) with softmax exclusivity constraints.
-7. Execute empirical benchmarking across accuracy, sensitivity, specificity, AUC-ROC, PR-AUC, and pseudo-labeling thresholds ($\tau$).
-8. Deploy an interactive full-stack clinical workstation.
+- **RQ1:** Can one testable preprocessing and inference path support every executable project surface?
+- **RQ2:** How should CLAHE and square padding be compared with simpler preprocessing under controlled partitions, seeds, and training budgets?
+- **RQ3:** Which conclusions are justified by the present data audit, and what controls are required for a patient-independent evaluation?
 
-## 1.7 Summary of Key Research Contributions
-1. **Proposed ROI Reflection Square Padding Algorithm:** Eliminates the $+38.5\%$ aspect ratio distortion error ($0.0\%$ $\mathcal{AR}$), preserving vertical malignant margin features.
-2. **Biophysical Contrast Enhancement (CLAHE):** Enhances lesion-to-background Contrast-to-Noise Ratio by $+210\%$ ($3.48$ vs. $1.12$) and elevates SNR by $+10.4\text{ dB}$ ($24.6\text{ dB}$ vs. $14.2\text{ dB}$).
-3. **4-Stage Comparative Noise Benchmark:** Proves the proposed framework sustains $96.8\%$ accuracy under clinical speckle ($\sigma = 0.05$) and $92.1\%$ under severe degradation ($\sigma = 0.15$).
-4. **State-of-the-Art Classification Performance:** EfficientNet-B0 achieves a peak validation accuracy of **98.2%**, sensitivity of **97.5%** (only 2 false negatives out of 80 malignant cases), and an **AUC-ROC of 0.991**.
-5. **Semi-Supervised Pseudo-Label Optimization:** Empirically identifies $\tau = 0.95$ as the optimal filtering threshold (Macro F1 = $0.9871$), resolving confirmation bias and data starvation.
+## 1.4 Objectives and contributions
+
+The implementation provides deterministic split and audit utilities, shared CLAHE and crop strategies, EfficientNet-B0, ResNet-50 and custom-CNN options, checkpoint metadata, per-image predictions, generated metrics and plots, regression tests, and a research-only FastAPI interface. The written and visual artifacts use the same current evidence status and withdraw unsupported historical benchmarks.
+
+## 1.5 Scope
+
+The configured task maps images to `benign` or `malignant`; images stored under `normal` are currently included in the non-malignant class. This is a modelling simplification. The project does not assign BI-RADS, recommend management, or establish clinical efficacy. No pseudo-labelling, preprocessing ablation, multi-seed comparison, external validation, or prospective reader study is claimed as completed.

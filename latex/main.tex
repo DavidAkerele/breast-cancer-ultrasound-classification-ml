@@ -11,37 +11,59 @@
 \usepackage{caption}
 \usepackage{float}
 \usepackage{microtype}
+\usepackage{fancyhdr}
 \usepackage[square,authoryear]{natbib}
 \setcitestyle{authoryear,open={[},close={]},aysep={}}
 \usepackage{setspace}
-\onehalfspacing
+\usepackage[table,dvipsnames]{xcolor}
+\definecolor{peacockteal}{RGB}{0, 109, 119}
+\definecolor{peacocknavy}{RGB}{4, 32, 28}
 \usepackage{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+
+\onehalfspacing
+\setlength{\parindent}{1.5em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{3em}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Breast Ultrasound Classification}
+\fancyhead[R]{\small \nouppercase{\leftmark}}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
 
 \hypersetup{
     colorlinks=true,
-    linkcolor=blue,
-    citecolor=blue,
-    urlcolor=blue,
-    pdftitle={Breast Cancer Ultrasound Classification Using Machine Learning},
+    linkcolor=peacockteal,
+    citecolor=peacockteal,
+    urlcolor=peacockteal,
+    pdftitle={Breast Ultrasound Classification Using Deep Learning},
     pdfauthor={Akerele David Damilola}
 }
 
 \begin{document}
 
 % Title Page
+\hypersetup{pageanchor=false}
 \begin{titlepage}
     \centering
     \vspace*{1.5cm}
-    {\Huge \bfseries BREAST CANCER ULTRASOUND CLASSIFICATION USING MACHINE LEARNING \par}
+    {\Huge \bfseries BREAST ULTRASOUND CLASSIFICATION USING DEEP LEARNING \par}
     \vspace{1.2cm}
     {\Large A DISSERTATION SUBMITTED TO MANCHESTER METROPOLITAN UNIVERSITY\\ FOR THE DEGREE OF MASTER OF SCIENCE\\ IN THE FACULTY OF SCIENCE AND ENGINEERING \par}
     \vspace{1.5cm}
-    \includegraphics[width=0.35\textwidth]{figures/fig1_4stage_matrix.png}\par
-    \vspace{1.2cm}
+    {\large A reproducibility-focused study of preprocessing, convolutional models, and evidence integrity\par}
+    \vspace{1.8cm}
     {\large \bfseries 2026 \par}
     \vspace{0.8cm}
     {\large By\\ \bfseries Akerele David Damilola \\ Department of Computing and Mathematics \par}
+    \vfill
+    \colorbox{Goldenrod!18}{%
+        \parbox{0.78\textwidth}{\centering\small\bfseries Evidence status: provisional\\[2pt]
+        \normalfont The supplied cohort fails the subject-level split audit; no clinical-performance claim is made.}%
+    }
 \end{titlepage}
+\hypersetup{pageanchor=true}
 
 \pagenumbering{roman}
 \input{abstract.tex}

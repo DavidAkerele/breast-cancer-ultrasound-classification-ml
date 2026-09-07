@@ -1,42 +1,11 @@
 \chapter{Conclusion and Future Work}
-\label{ch:conclusion}
 
-\section{Summary of Research Accomplishments}
-This Master of Science dissertation successfully designed, implemented, and systematically evaluated a robust, noise-resilient Computer-Aided Diagnosis (CAD) framework for automated breast ultrasound classification across multi-center clinical repositories. By addressing the fundamental vulnerabilities of out-of-distribution acoustic speckle noise and geometric aspect ratio distortion, this research bridged critical gaps between theoretical deep learning models and practical clinical deployment requirements.
+\section{Conclusion}
+This dissertation delivers a reproducible research framework for breast-ultrasound image classification with shared preprocessing, multiple convolutional architectures, transparent evaluation artifacts, and a read-only dataset audit. The work establishes that the software can train, evaluate, and serve a research demonstration, while also exposing why reproducibility controls are necessary before reporting biomedical performance.
 
-The core technical deliverables accomplished in this research comprise:
-\begin{enumerate}
-    \item \textbf{Mathematical Formulation of ROI Reflection Square Padding:} Formulated and mathematically proved an aspect-ratio-preserving preprocessing algorithm that crops tumor Regions of Interest with a 20\% acoustic context margin and applies symmetric boundary reflection padding. This completely eliminated the $+38.5\%$ geometric distortion error ($\mathcal{AR} = 0.0\%$) introduced by standard direct anamorphic resizing, preserving cardinal taller-than-wide BI-RADS malignant morphology.
-    \item \textbf{Biophysical Contrast Enhancement (CLAHE):} Integrated localized luminance histogram equalization calibrated for hypoechoic tissue structures, boosting lesion-to-background Contrast-to-Noise Ratios by $+210\%$ ($3.48$ vs. $1.12$) and elevating effective Signal-to-Noise Ratios by $+10.4\text{ dB}$ ($24.6\text{ dB}$ vs. $14.2\text{ dB}$).
-    \item \textbf{4-Stage Comparative Noise Stress-Testing Matrix:} Established a rigorous empirical benchmark mapping model degradation under multi-tier simulated Rayleigh speckle noise ($\sigma \in [0.01, 0.15]$), proving that the proposed pipeline retains $96.8\%$ classification accuracy under clinical speckle scatter ($\sigma = 0.05$) and sustains $92.1\%$ accuracy under extreme noise stress ($\sigma = 0.15$), whereas direct resizing baselines collapse to $52.3\%$.
-    \item \textbf{State-of-the-Art Diagnostic Classification:} The fine-tuned EfficientNet-B0 backbone achieved an optimal validation accuracy of \textbf{$98.2\%$}, an outstanding sensitivity of \textbf{$97.5\%$} (producing only 2 false negatives out of 80 malignant cases), a precision of $98.5\%$, and an overall \textbf{AUC-ROC of $0.991$} across multi-center benchmark datasets (\textsf{BUSI}, \textsf{OASBUD}, \textsf{BrEaST}).
-    \item \textbf{Semi-Supervised Pseudo-Labeling Threshold Optimization:} Conducted an extensive ablation study across confidence thresholds $\tau \in [0.80, 0.99]$, identifying $\tau = 0.95$ as the optimal filtering sweet spot (Macro F1 = $0.9871$, Malignant F1 = $0.9910$, Macro AUC = $0.9891$), effectively balancing confirmation bias and data starvation.
-    \item \textbf{Interactive Clinical Diagnostic Workstation:} Deployed a full-stack clinical dashboard featuring real-time inference, a 4-column noise laboratory suite, side-by-side model comparisons, and structured BI-RADS reporting tools.
-\end{enumerate}
+The supplied dataset copy does not yet support patient-independent or clinical claims. Its known cross-split subjects and missing BUSI provenance mean that the provisional bundled-checkpoint result is an engineering baseline only. Earlier static performance, pseudo-labelling, and noise-resilience values have therefore been withdrawn as empirical conclusions.
 
-\section{Practical Guidance for Biomedical Machine Learning}
-Based on the empirical findings of this dissertation, the following practical design guidelines are recommended for biomedical artificial intelligence researchers and clinical software engineers:
-\begin{itemize}
-    \item \textbf{Avoid Direct Anamorphic Resizing:} Medical ultrasound scans should never be directly resized to square neural network inputs without aspect ratio compensation. Enforcing isotropic scaling ($s_x = s_y$) via symmetric boundary reflection padding preserves biological diagnostic geometry without introducing edge artifacts.
-    \item \textbf{Prioritize Attention-Based Feature Recalibration:} In speckle-corrupted imaging modalities, architectures incorporating channel attention (e.g., Squeeze-and-Excitation blocks in EfficientNet) outperform deeper feed-forward residual networks by dynamically suppressing uninformative noise feature channels.
-    \item \textbf{Stress-Test Beyond Pristine Benchmarks:} Prior to clinical deployment, medical AI models must be evaluated against controlled out-of-distribution noise injection matrices to identify latent feature breakdown thresholds.
-    \item \textbf{Enforce Mutually Exclusive Probability Distributions:} Clinical diagnostic classification heads must utilize Softmax exclusivity constraints to provide valid, normalized probabilistic predictions that reflect genuine diagnostic certainty.
-\end{itemize}
+\section{Future work}
+The immediate priority is cohort reconstruction: retain original identifiers, group all views from each subject in one partition, and document data licences and exclusions. Next, rerun model selection with fixed seeds and saved configurations, evaluate once on an untouched test partition, and generate every table and figure from saved predictions. External-site evaluation, calibration, error analysis, and prospective human-factors validation are prerequisites for any clinical-development claim.
 
-\section{Actionable Future Research Directions}
-While this dissertation establishes a robust baseline for noise-resilient ultrasound classification, several promising research vectors warrant future investigation:
-
-\subsection{Self-Supervised Generative Diffusion Despeckling}
-Future work will explore integrating Denoising Diffusion Probabilistic Models (DDPM) \citep{Ho2020} or Masked Autoencoders (MAE) directly into the neural network feature extraction pipeline. By training a generative diffusion prior to model the underlying distribution of uncorrupted tissue echogenicity, the network can perform unsupervised zero-shot acoustic despeckling directly in the latent feature space, eliminating the need for explicit binary segmentation masks.
-
-\subsection{Vision Transformers (ViT) with Acoustic Patch Attention}
-Adapting Vision Transformers (ViT) \citep{Dosovitskiy2021} to sonography represents a compelling research avenue. Multi-head self-attention mechanisms can capture long-range spatial correlations across large ultrasound scans, modeling the global relationship between primary tumors and distant acoustic shadowing columns across entire breast quadrants.
-
-\subsection{Multi-Modal and Multi-Parametric Ultrasound Fusion}
-Extending the CAD framework to multi-parametric sonography: integrating B-mode gray-scale imagery with Color Doppler (vascularity mapping) and Shear-Wave Elastography (SWE, quantifying tissue stiffness in kilopascals) will provide multi-dimensional diagnostic features, further improving the differentiation of dense fibrous benign lesions from invasive malignant carcinomas.
-
-\subsection{Federated Learning for Multi-Hospital Privacy-Preserving Collaboration}
-To scale training across international hospital networks without violating patient data privacy regulations (GDPR, HIPAA), future implementations should deploy Federated Learning frameworks. Hospital nodes compute local gradient updates on private clinical data, transmitting only encrypted model weights to a central aggregation server.
-
-\subsection{Real-Time Edge Deployment on Point-of-Care Ultrasound (POCUS)}
-To democratize access to automated oncology screening in rural and low-resource healthcare clinics, the trained EfficientNet-B0 model will be optimized via TensorRT engine compilation and INT8 quantization for deployment on battery-powered, handheld Point-of-Care Ultrasound (POCUS) probes, providing real-time diagnostic guidance at the point of care.
+Future technical work may compare self-supervised pretraining, attention architectures, and domain adaptation, but only after the basic split and provenance controls are in place. The appropriate success criterion is not a headline accuracy alone; it is a transparent, repeatable estimate whose limitations are clear to researchers, clinicians, and patients.

@@ -1,17 +1,18 @@
 import os
 import argparse
 import cv2
+import numpy as np
 from PIL import Image
 import torch
 from torchvision import transforms
 
 try:
     from src import config
-    from src.dataset import apply_clahe
+    from src.dataset import find_mask_path, preprocess_image
     from src.models import get_model
 except ImportError:
     import config
-    from dataset import apply_clahe
+    from dataset import find_mask_path, preprocess_image
     from models import get_model
 
 @torch.no_grad()
@@ -27,8 +28,9 @@ def predict_image(image_path, model, transform, device, use_clahe=True):
     else:
         img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
 
-    if use_clahe and config.USE_CLAHE:
-        img_np = apply_clahe(img_np)
+    mask_path = find_mask_path(image_path)
+    mask_np = cv2.imread(mask_path) if mask_path else None
+    img_np = preprocess_image(img_np, use_clahe=use_clahe, mask_np=mask_np)
 
     # Validate if image is a medical ultrasound scan
     try:
@@ -81,13 +83,13 @@ def main():
             if fname.lower().endswith(('.png', '.jpg', '.jpeg', '.dcm', '.tif')):
                 fpath = os.path.join(args.image, fname)
                 pred_class, conf, _ = predict_image(fpath, model, val_transform, config.DEVICE)
-                print(f"File: {fname:<25} -> Prediction: {pred_class.upper():<10} (Confidence: {conf*100:.2f}%)")
+                print(f"File: {fname:<25} -> Prediction: {pred_class.upper():<10} (Softmax score: {conf*100:.2f}%)")
     else:
         pred_class, conf, probs = predict_image(args.image, model, val_transform, config.DEVICE)
         print("\n--- Prediction Result ---")
         print(f"Image Path:  {args.image}")
         print(f"Prediction:  {pred_class.upper()}")
-        print(f"Confidence:  {conf*100:.2f}%")
+        print(f"Softmax score: {conf*100:.2f}%")
         for idx, class_name in enumerate(config.CLASS_NAMES):
             print(f"  {class_name.capitalize():<10} probability: {probs[idx]*100:.2f}%")
 

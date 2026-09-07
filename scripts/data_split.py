@@ -1,57 +1,77 @@
 #!/usr/bin/env python3
-"""
-Utility to split the BrEaST ultrasound dataset into train/val/test sets.
-It assumes the dataset is extracted under `data/train/BrEaST-Lesions_USG-images_and_masks`.
-Each case consists of an image `caseXYZ.png` and its mask `caseXYZ_tumor.png`.
-The script randomly assigns each case to train (70%), val (15%), or test (15%)
-while moving both files to the corresponding directories preserving the structure.
-"""
-import os, random, shutil
+"""Create a deterministic subject-level image split without altering source files."""
+import argparse
+import json
+import random
+import re
+import shutil
+from collections import defaultdict
+from pathlib import Path
 
-random.seed(42)  # reproducible split
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
-DATA_ROOT = os.path.join(PROJECT_ROOT, "data")
-RAW_DIR = os.path.join(DATA_ROOT, "raw", "BrEaST-Lesions_USG-images_and_masks")
-SRC_DIR = RAW_DIR
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
+MASK_SUFFIXES = ("_mask", "_tumor", "_lesion_mask")
 
-# Target split directories (will be created if missing)
-SPLITS = {"train": os.path.join(DATA_ROOT, "train", "BrEaST-Lesions_USG-images_and_masks"),
-          "val": os.path.join(DATA_ROOT, "val", "BrEaST-Lesions_USG-images_and_masks"),
-          "test": os.path.join(DATA_ROOT, "test", "BrEaST-Lesions_USG-images_and_masks")}
 
-for split_path in SPLITS.values():
-    os.makedirs(split_path, exist_ok=True)
+def subject_id(path):
+    stem = path.stem
+    for suffix in MASK_SUFFIXES:
+        if stem.lower().endswith(suffix):
+            stem = stem[: -len(suffix)]
+    match = re.match(r"(case\d+|[^_]+)(?:_view\d+)?$", stem, re.I)
+    return (match.group(1) if match else stem).lower()
 
-# Gather case identifiers (without extension and without _tumor)
-files = [f for f in os.listdir(SRC_DIR) if f.endswith('.png')]
-case_ids = set()
-for f in files:
-    if f.endswith('_tumor.png'):
-        case_ids.add(f.replace('_tumor.png', ''))
-    else:
-        case_ids.add(f.replace('.png', ''))
 
-case_ids = sorted(case_ids)
+def allocate(subjects, rng, train_ratio, val_ratio):
+    values = sorted(subjects)
+    rng.shuffle(values)
+    train_end = round(len(values) * train_ratio)
+    val_end = train_end + round(len(values) * val_ratio)
+    return {
+        "train": values[:train_end],
+        "val": values[train_end:val_end],
+        "test": values[val_end:],
+    }
 
-for case in case_ids:
-    r = random.random()
-    if r < 0.70:
-        split = "train"
-    elif r < 0.85:
-        split = "val"
-    else:
-        split = "test"
-    dst_dir = SPLITS[split]
-    img_src = os.path.join(SRC_DIR, f"{case}.png")
-    mask_src = os.path.join(SRC_DIR, f"{case}_tumor.png")
-    for src in (img_src, mask_src):
-        if os.path.exists(src):
-            shutil.move(src, dst_dir)
-        else:
-            print(f"Warning: missing file {src}")
 
-print("Splitting completed.")
-print(f"Train: {len(os.listdir(SPLITS['train'])) // 2} cases")
-print(f"Val: {len(os.listdir(SPLITS['val'])) // 2} cases")
-print(f"Test: {len(os.listdir(SPLITS['test'])) // 2} cases")
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", type=Path, help="Folder containing one subfolder per class")
+    parser.add_argument("destination", type=Path, help="New output folder for train/val/test")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--train-ratio", type=float, default=0.70)
+    parser.add_argument("--val-ratio", type=float, default=0.15)
+    args = parser.parse_args()
+
+    if args.train_ratio <= 0 or args.val_ratio < 0 or args.train_ratio + args.val_ratio >= 1:
+        raise SystemExit("Ratios must leave a positive test partition.")
+    if not args.source.is_dir():
+        raise SystemExit(f"Source folder not found: {args.source}")
+    if args.destination.exists() and any(args.destination.rglob("*")):
+        raise SystemExit(f"Destination must be empty: {args.destination}")
+
+    grouped = defaultdict(lambda: defaultdict(list))
+    for class_dir in sorted(path for path in args.source.iterdir() if path.is_dir()):
+        for path in sorted(class_dir.iterdir()):
+            if path.suffix.lower() in IMAGE_SUFFIXES:
+                grouped[class_dir.name][subject_id(path)].append(path)
+
+    rng = random.Random(args.seed)
+    manifest = {"seed": args.seed, "source": str(args.source.resolve()), "splits": {}}
+    for class_name, subjects in grouped.items():
+        split_subjects = allocate(subjects, rng, args.train_ratio, args.val_ratio)
+        for split, identifiers in split_subjects.items():
+            for identifier in identifiers:
+                manifest["splits"].setdefault(split, {}).setdefault(class_name, []).append(identifier)
+                target_dir = args.destination / split / class_name
+                target_dir.mkdir(parents=True, exist_ok=True)
+                for source_path in subjects[identifier]:
+                    shutil.copy2(source_path, target_dir / source_path.name)
+
+    manifest_path = args.destination / "split_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"Created subject-level split at {args.destination} with manifest {manifest_path}")
+
+
+if __name__ == "__main__":
+    main()

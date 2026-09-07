@@ -1,229 +1,129 @@
 \chapter{Methodology and Experimental Design}
 \label{ch:methodology}
 
-\section{Introduction}
-This chapter presents the comprehensive architectural, mathematical, algorithmic, and experimental methodology formulated in this dissertation. To overcome the clinical vulnerabilities of out-of-distribution acoustic noise and geometric aspect ratio distortion, this research establishes an end-to-end, noise-resilient Computer-Aided Diagnosis (CAD) framework for automated breast ultrasound classification. 
+\section{Study design and evidence levels}
+The project follows an implementation-and-evaluation design. Its primary unit of analysis is an image, but its required unit of partitioning is the subject. Two evidence levels are distinguished:
 
-The methodology is structured across six cohesive modules: (1) Multi-center clinical dataset curation and stratification, (2) The mathematical formulation of the Proposed ROI Reflection Square Padding algorithm, (3) Biophysical contrast enhancement via localized CLAHE, (4) A multi-tier synthetic acoustic noise simulation engine, (5) Deep convolutional transfer learning architectures with softmax exclusivity constraints, and (6) Quantitative mathematical evaluation metrics.
+\begin{description}
+    \item[Engineering evidence] confirms that preprocessing, model loading, inference, metric computation, and artifact generation execute consistently.
+    \item[Generalisation evidence] estimates performance on subjects independent of model development and requires verified subject-level separation, preserved provenance, and a frozen test set.
+\end{description}
 
-\section{Overall System Architecture and Experimental Pipeline}
-Figure~\ref{fig:methodology_4stage} illustrates the end-to-end processing pipeline, tracing an input clinical sonogram through multi-stage degradation, biophysical enhancement, aspect-ratio-preserving padding, and deep neural classification.
+The current repository supports the first level. Because the supplied local cohort fails the split audit, results from it are marked provisional throughout.
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.95\textwidth]{figures/fig1_4stage_matrix.png}
-    \caption{Detailed 4-Stage Comparative Ultrasound Degradation, Preprocessing, and Feature Extraction Matrix.}
-    \label{fig:methodology_4stage}
-\end{figure}
+\section{Data sources and label mapping}
+The local project combines organised copies of BUSI, OASBUD, and BrEaST. BUSI is a public B-mode image dataset with normal, benign, and malignant labels and lesion masks \citep{AlDhabyani2020}. OASBUD contains multiple views per lesion \citep{Piotrzkowska2017}. The BrEaST copy uses case identifiers and includes a small normal subset.
 
-\section{Multi-Center Clinical Dataset Curation and Stratification}
-To ensure robust clinical generalizability across diverse patient demographics and ultrasound scanner hardware configurations, this study integrates three established multi-center benchmark repositories:
+The configured task is binary: \texttt{benign} and \texttt{malignant}. Files in a \texttt{normal} directory are mapped to the non-malignant class by the loader. This makes the executable task consistent but collapses clinically different categories, so the decision must be reviewed and predeclared before a definitive experiment.
 
-\begin{enumerate}
-    \item \textbf{Breast Ultrasound Images (BUSI) Dataset:} Acquired in 2018 at Baheya Hospital for Early Detection and Treatment of Women's Cancer (Cairo, Egypt) using high-end LOGIQ E9 ultrasound systems \citep{AlDhabyani2020}. The dataset comprises 780 clinical images ($133$ normal, $437$ benign, and $210$ malignant) from female patients aged 25 to 75 years, with an average spatial resolution of $500 \times 500$ pixels. Scans include expert radiologist lesion boundary ground-truth masks.
-    \item \textbf{Open Access Ultrasound Database (OASBUD):} Curated by the Institute of Fundamental Technological Research, Polish Academy of Sciences \citep{Piotrzkowska2017}. OASBUD provides raw radiofrequency (RF) backscatter signals and reconstructed B-mode sonograms across 100 breast lesions (48 benign, 52 biopsy-proven malignant carcinomas) acquired with an Ultrasonix SonixTouch scanner equipped with an L14-5/38 linear transducer probe operating at $10\text{ MHz}$.
-    \item \textbf{BrEaST Benchmark Dataset:} A multi-center validation repository curated across tertiary oncology centers, containing clinical ultrasound scans categorized according to strict American College of Radiology (ACR) BI-RADS assessment criteria with histology-confirmed pathology reports.
-\end{enumerate}
+The combined loader currently finds the counts in Table~\ref{tab:local_counts}. Mask files are excluded from the image count.
 
-\subsection{Stratified Partitioning Protocol}
-To prevent data leakage and preserve class distribution fidelity, the multi-center dataset is combined and partitioned into three non-overlapping subsets using stratified sampling:
-\begin{itemize}
-    \item \textbf{Training Partition (70\%, $N = 828$ scans):} Utilized for parameter optimization, backpropagation, and data augmentation.
-    \item \textbf{Validation Partition (15\%, $N = 177$ scans):} Utilized for epoch-by-epoch loss monitoring, learning rate scheduler triggers, and early stopping checkpoint selection.
-    \item \textbf{Held-Out Test Partition (15\%, $N = 177$ scans):} Strictly isolated during training and hyperparameter tuning; utilized exclusively for final multi-model benchmarking, noise stress-testing, and pseudo-label ablation evaluations.
-\end{itemize}
+\begin{table}[htbp]
+\centering
+\caption{Images found in the supplied local folders. These are directory counts, not an audited cohort.}
+\label{tab:local_counts}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Training} & \textbf{Validation} & \textbf{Test} & \textbf{Total} \\ \midrule
+BUSI & 100 & 50 & 50 & 200 \\
+OASBUD & 140 & 30 & 30 & 200 \\
+BrEaST & 162 & 27 & 40 & 229 \\ \midrule
+Combined & 402 & 107 & 120 & 629 \\ \bottomrule
+\end{tabular}
+\end{table}
 
-\section{Proposed ROI Reflection Square Padding Algorithm}
-In clinical ultrasonography, malignant tumors frequently invade vertically across anatomical Cooper's ligaments, producing a "taller-than-wide" morphology ($H/W > 1.0$) with non-circumscribed margins and posterior acoustic shadows \citep{Stavros1995}. Conversely, benign lesions align horizontally ($H/W < 1.0$). Standard direct anamorphic resizing squishes rectangular sonograms into square tensors ($224 \times 224$), introducing $+38.5\%$ aspect ratio distortion error ($\mathcal{AR}$) and flattening taller-than-wide malignant lesions.
+\section{Split-integrity audit}
+The read-only audit enumerates eligible image files, derives subject identifiers where the naming convention permits, and records every partition associated with an identifier. For OASBUD it removes the view suffix; for BrEaST it uses the \texttt{caseNNN} prefix. The BUSI files in this local copy were renamed to generated sample identifiers, so patient separation cannot be reconstructed from filenames alone.
 
-To eliminate geometric distortion while isolating diagnostic lesion tissue and preserving surrounding acoustic shadowing, we formulate the \textbf{Proposed ROI Reflection Square Padding Algorithm}.
+An audit passes only when every included dataset has verifiable identifiers and no identifier occurs in more than one partition. The current audit fails: OASBUD subject \texttt{30nh} occurs in training and validation, while BrEaST \texttt{case140} spans training and test and \texttt{case151} spans training and validation. BUSI is additionally marked unverifiable. The training entry point therefore stops by default. An \texttt{--allow-unaudited-data} override exists solely for explicitly provisional engineering runs and is recorded in the checkpoint through the audit status.
 
-\subsection{Mathematical Formulation}
-Let $I \in \mathbb{R}^{H \times W \times C}$ denote an input ultrasound image matrix of height $H$, width $W$, and channels $C$. Let $M \in \{0, 1\}^{H \times W}$ represent the binary lesion mask. The bounding box spatial extrema are defined by:
+For the final experiment, the supplied \texttt{data\_split.py} utility copies grouped source files into deterministic class-stratified subject partitions and writes a manifest. Copying rather than moving preserves the source dataset. The generated manifest, source checksums, and audit report should be versioned with the run metadata, subject to dataset licensing constraints.
+
+\section{Preprocessing pipeline}
+All training, evaluation, command-line prediction, and API routes call the same preprocessing implementation. Images are decoded to RGB, optionally enhanced with CLAHE, transformed according to a selected geometric strategy, converted to tensors, and normalised with ImageNet channel statistics for the transfer-learning backbones.
+
+\subsection{CLAHE}
+The image is converted from RGB to LAB. CLAHE is applied only to the luminance channel using OpenCV with clip limit 2.0 and a $16\times16$ tile grid; the result is then converted back to RGB. The operation can be disabled through configuration or request parameters.
+
+\subsection{Mask discovery and region selection}
+The loader recognises paired masks ending in \path{_mask.png}, \path{_tumor.png}, or \path{_lesion_mask.png}. When a non-empty mask is available, the inclusive lesion bounding box is expanded by a 20\% width and height margin, clipped to the image boundaries, and extracted. When no mask is available, the implementation uses the central 80\% of the image before margin expansion. This fallback is deterministic but is not lesion localisation and is documented as such.
+
+\subsection{Square padding}
+For a crop of height $h_c$ and width $w_c$, let
 \begin{equation}
-y_{\min} = \min \{ y \mid M(y, x) > 0 \}, \quad y_{\max} = \max \{ y \mid M(y, x) > 0 \}
-\label{eq:y_extrema}
+d=\max(h_c,w_c).
 \end{equation}
-\begin{equation}
-x_{\min} = \min \{ x \mid M(y, x) > 0 \}, \quad x_{\max} = \max \{ x \mid M(y, x) > 0 \}
-\label{eq:x_extrema}
-\end{equation}
+The vertical and horizontal padding are
+\begin{align}
+p_t &= \left\lfloor\frac{d-h_c}{2}\right\rfloor,
+&p_b &= d-h_c-p_t,\\
+p_l &= \left\lfloor\frac{d-w_c}{2}\right\rfloor,
+&p_r &= d-w_c-p_l.
+\end{align}
+OpenCV \texttt{BORDER\_REFLECT\_101} fills the boundary, after which the square is resized to $224\times224$ pixels with bicubic interpolation. Because both output axes scale from side $d$, the final resize is isotropic. Direct resize and centre crop are implemented as comparator strategies.
 
-The bounding box height and width are $h_{box} = y_{\max} - y_{\min}$ and $w_{box} = x_{\max} - x_{\min}$. To preserve critical acoustic context (specifically posterior acoustic shadowing and lateral edge shadowing), a proportional context margin expansion ratio $\alpha = 0.20$ (20\%) is applied symmetrically:
-\begin{equation}
-y_1 = \max(0, y_{\min} - \alpha \cdot h_{box}), \quad y_2 = \min(H, y_{\max} + \alpha \cdot h_{box})
-\label{eq:margin_y}
-\end{equation}
-\begin{equation}
-x_1 = \max(0, x_{\min} - \alpha \cdot w_{box}), \quad x_2 = \min(W, x_{\max} + \alpha \cdot w_{box})
-\label{eq:margin_x}
-\end{equation}
+\subsection{Augmentation}
+Training uses random horizontal flips and rotations up to $15^{\circ}$. Vertical flips are intentionally excluded because the depth axis has acquisition meaning in ultrasound. Validation and test transforms contain no random augmentation.
 
-The extracted cropped region $I_{\text{crop}} = I[y_1:y_2, x_1:x_2]$ has dimensions $h_c = y_2 - y_1$ and $w_c = x_2 - x_1$. To transform $I_{\text{crop}}$ into an exact isotropic square tensor without introducing non-uniform spatial scaling, the maximal spatial dimension is identified:
-\begin{equation}
-d_{\max} = \max(h_c, w_c)
-\label{eq:max_dimension}
-\end{equation}
-
-Symmetric boundary padding values ($pad_{\text{top}}, pad_{\text{bottom}}, pad_{\text{left}}, pad_{\text{right}}$) are computed:
-\begin{equation}
-pad_{\text{top}} = \left\lfloor \frac{d_{\max} - h_c}{2} \right\rfloor, \quad pad_{\text{bottom}} = d_{\max} - h_c - pad_{\text{top}}
-\label{eq:pad_vertical}
-\end{equation}
-\begin{equation}
-pad_{\text{left}} = \left\lfloor \frac{d_{\max} - w_c}{2} \right\rfloor, \quad pad_{\text{right}} = d_{\max} - w_c - pad_{\text{left}}
-\label{eq:pad_horizontal}
-\end{equation}
-
-Crucially, rather than applying constant zero-padding (black borders) which generates artificial high-frequency edge gradients that mislead convolutional filters, we apply \textbf{Symmetric Boundary Reflection Padding} (\textsf{BORDER\_REFLECT\_101}):
-\begin{equation}
-I_{\text{padded}}(y, x) = \begin{cases} 
-I_{\text{crop}}(|y|, x), & \text{if } y < 0 \\
-I_{\text{crop}}(2h_c - 2 - y, x), & \text{if } y \ge h_c \\
-I_{\text{crop}}(y, |x|), & \text{if } x < 0 \\
-I_{\text{crop}}(y, 2w_c - 2 - x), & \text{if } x \ge w_c 
-\end{cases}
-\label{eq:reflection_padding}
-\end{equation}
-
-The padded square tensor $I_{\text{padded}} \in \mathbb{R}^{d_{\max} \times d_{\max} \times C}$ is subsequently resized to $224 \times 224 \times C$ using bicubic interpolation.
-
-\subsection{Proof of Aspect Ratio Preservation}
-Under the proposed algorithm, the scaling factors along horizontal and vertical axes are identical:
-\begin{equation}
-s_x = \frac{224}{d_{\max}}, \quad s_y = \frac{224}{d_{\max}} \implies \frac{s_x}{s_y} = 1.000
-\label{eq:isotropic_scaling}
-\end{equation}
-
-Substituting into Equation~\ref{eq:aspect_ratio_error_formulation}:
-\begin{equation}
-\mathcal{AR} = \left| 1.0 - \frac{224 / 224}{d_{\max} / d_{\max}} \right| \times 100\% = | 1.0 - 1.0 | \times 100\% = 0.0\%
-\label{eq:zero_distortion_proof}
-\end{equation}
-
-This proves mathematically that the proposed ROI reflection square padding algorithm completely eliminates geometric aspect ratio distortion ($\mathcal{AR} = 0.0\%$).
-
-\section{Biophysical Contrast Enhancement (CLAHE)}
-To amplify subtle echogenicity differentials between hypoechoic malignant masses and background parenchyma without amplifying high-frequency background speckle, localized CLAHE is applied \citep{Zuiderveld1994}.
-
-The image is transformed into the CIE LAB color space, isolating the luminance channel $L \in [0, 100]$. The luminance plane is partitioned into a contextual grid of $16 \times 16$ non-overlapping tiles. In each tile, a clip limit $\beta = 2.0$ is enforced. Histogram bins exceeding $\beta$ are clipped, and the surplus mass $\Delta$ is uniformly distributed. Following CDF mapping, bilinear interpolation is applied between tile grid centers, producing the enhanced luminance channel $L'$, which is merged with chromaticity channels $(a, b)$ and mapped back to RGB space.
-
-\section{Synthetic Acoustic Noise Simulation Engine}
-To stress-test deep learning model robustness across diverse ultrasound hardware gain settings and electronic environments, a multi-tier noise injection engine was developed:
-
-\begin{enumerate}
-    \item \textbf{Multiplicative Rayleigh Acoustic Speckle Noise:}
-    \begin{equation}
-    I_{\text{speckle}}(x, y) = I(x, y) + I(x, y) \cdot \eta_m(x, y), \quad \eta_m \sim \mathcal{N}(0, \sigma^2)
-    \label{eq:rayleigh_noise_inj}
-    \end{equation}
-    where $\sigma \in [0.01, 0.15]$ models increasing acoustic scattering density.
-    \item \textbf{Additive White Gaussian Sensor Noise (AWGN):}
-    \begin{equation}
-    I_{\text{gaussian}}(x, y) = I(x, y) + \eta_a(x, y), \quad \eta_a \sim \mathcal{N}(0, \sigma_g^2)
-    \label{eq:gaussian_noise_inj}
-    \end{equation}
-    simulating electronic thermal noise in piezoelectric transducer elements.
-    \item \textbf{Impulse Transmission Noise (Salt-and-Pepper):}
-    \begin{equation}
-    I_{\text{impulse}}(x, y) = \begin{cases} 
-    0, & \text{with probability } p/2 \\
-    255, & \text{with probability } p/2 \\
-    I(x, y), & \text{with probability } 1 - p 
-    \end{cases}
-    \label{eq:impulse_noise_inj}
-    \end{equation}
-    simulating analog-to-digital converter (ADC) transmission dropouts.
-\end{enumerate}
-
-\section{Deep Neural Network Architectures and Softmax Exclusivity}
-Three distinct convolutional neural network backbones were implemented, fine-tuned, and evaluated:
+\section{Model architectures}
+Three architectures share a two-class output contract:
 
 \begin{itemize}
-    \item \textbf{EfficientNet-B0:} 5.3 million parameters. Employs compound scaling with Mobile Inverted Bottleneck (MBConv) blocks, depthwise separable convolutions, and Squeeze-and-Excitation channel attention ($r = 4$) \citep{Tan2019, Hu2018}.
-    \item \textbf{ResNet-50:} 25.6 million parameters. Utilizes 50 convolutional layers structured into 4 residual bottleneck stages with identity skip connections \citep{He2016}.
-    \item \textbf{Custom 4-Block CNN Baseline:} 1.2 million parameters. Constructed from 4 convolutional blocks ($32 \rightarrow 64 \rightarrow 128 \rightarrow 256$ filters), Batch Normalization, ReLU activations, $2 \times 2$ Max Pooling, Adaptive Average Pooling, and Dropout ($p = 0.5$).
+    \item \textbf{EfficientNet-B0} initialised from torchvision ImageNet weights, with its classifier replaced by dropout and a two-output linear layer \citep{Tan2019};
+    \item \textbf{ResNet-50} initialised from torchvision ImageNet weights, with its fully connected layer replaced by dropout and a two-output linear layer \citep{He2016}; and
+    \item \textbf{Custom CNN} with four convolutional stages, batch normalisation, ReLU, max pooling, adaptive average pooling, dropout, and a two-output linear layer.
 \end{itemize}
 
-\subsection{Softmax Exclusivity Constraint}
-To prevent ambiguous or physically impossible multi-label clinical predictions, the final classification layer maps logit outputs $\mathbf{z} \in \mathbb{R}^K$ to a mutually exclusive probability distribution:
-\begin{equation}
-P(Y = c \mid \mathbf{x}) = \frac{\exp(z_c)}{\sum_{j=1}^{K} \exp(z_j)}, \quad \text{such that } \sum_{c=1}^{K} P(Y = c \mid \mathbf{x}) \equiv 1.000
-\label{eq:softmax_constraint}
-\end{equation}
+Transfer learning is used only during training. Evaluation reconstructs the architecture without downloading pretrained weights and loads the stored state dictionary.
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figures/fig7_certainty_boxplot.png}
-    \caption{Forward Pass Prediction Certainty Distribution ($\%$) for Malignant Class across Preprocessing Paradigms, demonstrating tight, calibrated confidence under the Proposed ROI Crop pipeline ($99.6\%$ mean certainty).}
-    \label{fig:certainty_boxplot}
-\end{figure}
+\section{Optimisation and reproducibility controls}
+The default optimisation configuration uses class-weighted cross-entropy, AdamW with learning rate $10^{-4}$ and weight decay $10^{-4}$, cosine annealing, batch size 16, up to 25 epochs, and early stopping after five validation epochs without loss improvement. Class weights are computed from the training directory counts as
+\begin{equation}
+w_c=\frac{N}{K N_c},
+\end{equation}
+where $N$ is the training size, $K$ is the number of classes, and $N_c$ is the count for class $c$.
 
-As shown in Figure~\ref{fig:certainty_boxplot}, the proposed ROI padded pipeline produces narrow, well-calibrated confidence bounds ($99.6\%$ mean certainty) compared to high variance and low certainty under direct resizing ($56.8\%$).
+The training command accepts a seed, defaulting to 42, and seeds Python, NumPy, PyTorch, and CUDA where available. Each best-loss checkpoint stores the architecture, epoch, optimiser state, validation loss and accuracy, class names, seed, learning rate, batch size, requested epoch budget, dataset-combination flag, crop strategy, CLAHE flag, creation time, and data-audit status.
 
-\section{Training Protocols and Mathematical Optimization}
-Models were optimized using the following hyperparameters and loss formulations:
+Exact bitwise reproducibility can still depend on hardware, library versions, and non-deterministic kernels. A final run should therefore record the environment lock, device, repository revision, and checksums in addition to the checkpoint metadata.
 
-\subsection{Class-Weighted Cross-Entropy Loss}
-To counteract class imbalance between benign and malignant cases, class weights $W_c$ were incorporated into the cross-entropy objective:
-\begin{equation}
-\mathcal{L}_{\text{WCE}} = - \frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{K} W_c \cdot y_{i, c} \cdot \log \hat{p}_{i, c}, \quad \text{where } W_c = \frac{N}{K \cdot N_c}
-\label{eq:weighted_ce_loss}
-\end{equation}
-where $N_c$ is the number of training samples in class $c$.
+\section{Evaluation protocol}
+The evaluator loads a named checkpoint and processes validation or test data without random augmentation. For each sample it records the relative path, true class, predicted class, and malignant-class probability. It then writes:
 
-\subsection{Optimization Algorithm and Learning Rate Schedule}
-Models were optimized using \textbf{AdamW} (Adam with Decoupled Weight Decay) \citep{Loshchilov2019}:
-\begin{equation}
-\mathbf{\theta}_{t+1} = \mathbf{\theta}_t - \eta_t \left( \frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t} + \epsilon} + \lambda \mathbf{\theta}_t \right)
-\label{eq:adamw_update}
-\end{equation}
-with initial learning rate $\eta_0 = 1 \times 10^{-4}$, weight decay $\lambda = 1 \times 10^{-4}$, $\beta_1 = 0.9, \beta_2 = 0.999$, batch size $B = 16$, and Cosine Annealing learning rate decay:
-\begin{equation}
-\eta_t = \eta_{\min} + \frac{1}{2}(\eta_0 - \eta_{\min})\left( 1 + \cos\left( \frac{t}{T_{\max}} \pi \right) \right)
-\label{eq:cosine_annealing}
-\end{equation}
+\begin{itemize}
+    \item \texttt{predictions.csv}, the per-image evidence table;
+    \item \texttt{metrics.json}, including accuracy, macro precision, macro recall, macro F1, ROC-AUC, confusion matrix, preprocessing configuration, generation time, audit status, and audit checksum;
+    \item \texttt{confusion\_matrix.png}; and
+    \item \texttt{roc\_curve.png}.
+\end{itemize}
 
-\section{Semi-Supervised Pseudo-Labeling Formulation}
-To leverage unannotated ultrasound candidate scans, a semi-supervised Teacher-Student framework was implemented \citep{Lee2013, Sohn2020}. A teacher network $f_\theta$ trained on labeled set $\mathcal{D}_L = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$ generates soft prediction vectors $\hat{\mathbf{p}}_u = \text{Softmax}(f_\theta(\mathbf{u}))$ for unannotated scans $\mathbf{u} \in \mathcal{D}_U$.
+Accuracy is
+\begin{equation}
+\operatorname{Accuracy}=\frac{TP+TN}{TP+TN+FP+FN},
+\end{equation}
+and class F1 is
+\begin{equation}
+F1=2\frac{\operatorname{Precision}\times\operatorname{Recall}}{\operatorname{Precision}+\operatorname{Recall}}.
+\end{equation}
+Macro metrics average class-level values equally. ROC-AUC is calculated from malignant-class probabilities for this binary task. A definitive experiment should add uncertainty intervals, calibration, and a predeclared policy for exclusions and missing data.
 
-Pseudo-labels $\hat{y}_u = \arg\max_c \hat{p}_{u, c}$ are assigned if and only if the maximum class confidence satisfies a confidence threshold $\tau$:
-\begin{equation}
-\mathcal{M}_u = \mathbb{I}\left( \max_{c} \hat{p}_{u, c} \ge \tau \right)
-\label{eq:confidence_mask}
-\end{equation}
+\section{Web research demonstration}
+FastAPI serves model inference and a static interface. Upload validation limits files to recognised image formats and 20 MB. The client exposes the selected preprocessing configuration, probability vector, Grad-CAM overlay, image-quality heuristics, batch outputs, and controlled seeded perturbations. It also reads the evaluator's metrics file rather than embedding benchmark values.
 
-The student network is retrained on the combined objective:
-\begin{equation}
-\mathcal{L}_{\text{total}} = \frac{1}{|\mathcal{D}_L|} \sum_{(\mathbf{x}, y) \in \mathcal{D}_L} \mathcal{H}(y, f_\theta(\mathbf{x})) + \lambda_u \frac{1}{|\mathcal{D}_U|} \sum_{\mathbf{u} \in \mathcal{D}_U} \mathcal{M}_u \cdot \mathcal{H}(\hat{y}_u, f_\theta(\mathbf{u}))
-\label{eq:semi_supervised_loss}
-\end{equation}
-where $\mathcal{H}$ is cross-entropy loss and $\lambda_u = 1.0$ is the unsupervised loss weighting parameter.
+The interface does not assign a diagnosis, BI-RADS category, clinical priority, or management recommendation. Its report text and batch labels explicitly identify outputs as research-only. Ground truth is accepted only when supplied by the dataset endpoint or the user; it is never inferred from a filename.
 
-\section{Quantitative Evaluation Metrics}
-Model diagnostic efficacy was evaluated across standard mathematical metrics computed on the held-out test partition:
+\section{Definitive experiment specification}
+Before comparative claims are reported, the following sequence is required:
 
-\begin{equation}
-\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}
-\label{eq:accuracy_metric}
-\end{equation}
-\begin{equation}
-\text{Sensitivity (Recall)} = \frac{TP}{TP + FN}, \quad \text{Specificity} = \frac{TN}{TN + FP}
-\label{eq:sens_spec_metric}
-\end{equation}
-\begin{equation}
-\text{Precision} = \frac{TP}{TP + FP}, \quad F1 = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
-\label{eq:f1_metric}
-\end{equation}
-\begin{equation}
-\text{Macro F1} = \frac{1}{K} \sum_{c=1}^{K} F1_c, \quad \text{Micro F1} = \frac{\sum TP_c}{\sum (TP_c + \frac{1}{2}(FP_c + FN_c))}
-\label{eq:macro_micro_f1}
-\end{equation}
-\begin{equation}
-\text{SNR}_{\text{dB}} = 20 \log_{10} \left( \frac{\mu_{\text{lesion}}}{\sigma_{\text{lesion}}} \right)
-\label{eq:snr_metric}
-\end{equation}
-\begin{equation}
-\text{CNR} = \frac{|\mu_{\text{lesion}} - \mu_{\text{background}}|}{\sqrt{\sigma_{\text{lesion}}^2 + \sigma_{\text{background}}^2}}
-\label{eq:cnr_metric}
-\end{equation}
+\begin{enumerate}
+    \item recover original identifiers and document licences, versions, exclusions, and label mapping;
+    \item assign all images, views, and masks from one subject to exactly one partition;
+    \item freeze the test manifest before model selection;
+    \item select preprocessing and hyperparameters using training and validation data only;
+    \item train each comparator across predeclared seeds and equal tuning budgets;
+    \item evaluate locked checkpoints once on the untouched test subjects;
+    \item publish per-image predictions, aggregate metrics with uncertainty, audit outputs, and failure analysis; and
+    \item regenerate all dissertation tables and figures directly from those artifacts.
+\end{enumerate}
+
+This sequence converts the implemented framework into a valid generalisation study while preserving the distinction between exploratory development and final evidence.

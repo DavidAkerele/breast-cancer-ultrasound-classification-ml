@@ -1,23 +1,19 @@
-# Chapter 4: Implementation and Training
+# Chapter 4: Implementation and Training Controls
 
-## 4.1 Multi-Center Dataset Processing and Stratified Splits
-The multi-center dataset (**BUSI**, **OASBUD**, **BrEaST**) was partitioned using stratified sampling:
-- **Training Set (70%, $N=828$):** Used for gradient-based parameter optimization.
-- **Validation Set (15%, $N=177$):** Used to monitor generalization, trigger learning rate schedulers, and select optimal checkpoints.
-- **Held-Out Test Set (15%, $N=177$):** Isolated for final objective benchmarking.
+## 4.1 Repository structure
 
-### Class Imbalance & Weighted Cross-Entropy Loss
-To prevent algorithmic bias toward the majority benign class, reciprocal class weights are integrated into the cross-entropy loss function:
-$$W_c = \frac{N}{K \cdot N_c}$$
-$$\mathcal{L}_{\text{WCE}} = - \frac{1}{N} \sum_{i=1}^N \sum_{c=1}^K W_c \cdot y_{i, c} \cdot \log \hat{p}_{i, c}$$
+The executable code is separated into configuration, dataset, model, training, evaluation, prediction, and API modules. Thin root-level entry points keep commands stable. Generated evidence is written to `outputs/`, while the dissertation source, supporting documents, notebook, slides, and web interface remain version-controlled.
 
-## 4.2 Optimization Dynamics & Hyperparameters
-- **Loss Function:** Class-Weighted Cross-Entropy Loss.
-- **Optimizer:** AdamW with decoupled weight decay ($\lambda = 1 \times 10^{-4}$), $\beta_1 = 0.9, \beta_2 = 0.999$, and initial learning rate $\eta_0 = 1 \times 10^{-4}$.
-- **Learning Rate Schedule:** Cosine Annealing decay across 25 epochs:
-  $$\eta_t = \eta_{\min} + \frac{1}{2}(\eta_0 - \eta_{\min})\left( 1 + \cos\left( \frac{t}{T_{\max}} \pi \right) \right)$$
-- **Batch Size:** 16.
-- **Regularization & Augmentation:** Dropout ($p = 0.5$) in the classification head, combined with Random Horizontal/Vertical Flips ($p=0.5$) and Random Rotations ($\pm 15^\circ$).
+## 4.2 Training guard and checkpoint metadata
 
-## 4.3 Training Convergence
-Training loss converged rapidly from $0.55$ to $0.015$ over 10 epochs for EfficientNet-B0, maintaining stable validation loss without evidence of gradient divergence or severe overfitting.
+Before training, the pipeline regenerates `outputs/data_audit.json`. A failed audit stops the run unless the user explicitly supplies `--allow-unaudited-data`; this override does not convert the result into valid evidence. The best validation-loss checkpoint stores the model and optimiser states plus the model name, epoch, validation metrics, class names, seed, batch size, learning rate, epoch budget, dataset-combination flag, crop strategy, CLAHE flag, creation time, and audit status.
+
+## 4.3 Evaluation implementation
+
+Evaluation reconstructs the selected model without downloading pretrained weights and loads the checkpoint state. The test loader contains no stochastic augmentation. Per-image outputs are saved before aggregate metrics are calculated so every reported number can be regenerated.
+
+The current bundled checkpoint was produced before the strengthened metadata schema. Its latest evaluation on the unaudited 120-image test folders is reported only as a provisional software-regression result in Chapter 5.
+
+## 4.4 Verification
+
+The test suite checks output dimensions for every crop strategy, discovery of supported mask suffixes, explicit failure of the current data audit, and the API's no-clinical-action response. Syntax compilation, notebook validation, LaTeX compilation, browser checks, and render inspection of Word and PowerPoint outputs form separate release gates.

@@ -1,57 +1,94 @@
 # Breast Ultrasound Classification Dissertation
 
-This repository contains the software and dissertation sources for an MSc research project on binary breast-ultrasound image classification. It is a research prototype, not a clinical device and must not be used for diagnosis or patient-management decisions.
+> **MSc research prototype — not a clinical device.** This repository documents a reproducible binary breast-ultrasound classification study and must not be used for diagnosis or patient-management decisions.
 
-## Current evidence status
+<p align="center">
+  <a href="#evidence-status">Evidence status</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#project-map">Project map</a> ·
+  <a href="#submission-artifacts">Artifacts</a> ·
+  <a href="#before-submission">Before submission</a>
+</p>
 
-The repository is being prepared for reproducible evaluation. The current data audit identifies cross-split subjects in OASBUD and BrEaST and cannot verify patient-level separation in the renamed BUSI copy. Consequently, the bundled checkpoint's latest test result (**78.33% accuracy; ROC-AUC 0.8612; 120 images**) is a **provisional engineering result**, not a valid patient-independent clinical performance estimate.
+## Evidence status
 
-Do not cite earlier headline values from superseded project assets. Submission-facing code, documentation, notebook, website, Word document, and slides now use only the generated provisional record above; withdrawn visual assets are isolated under `docs/archive/` with an explicit warning.
+| Current checkpoint | Evaluation record | Interpretation |
+| --- | --- | --- |
+| EfficientNet-B0 | **120 images** · **78.33% accuracy** · **0.7811 macro F1** · **0.8612 ROC-AUC** | **Provisional engineering evidence only** |
 
-## Repository layout
+The local split audit finds cross-partition subjects in OASBUD and BrEaST and cannot verify subject separation in the renamed BUSI copy. These values demonstrate that the end-to-end software path works; they are not a patient-independent or clinical-performance estimate.
 
-- `src/` — PyTorch data, model, train, evaluate, prediction, and FastAPI modules.
-- `scripts/audit_data.py` — read-only split and subject-identifier audit.
-- `scripts/data_split.py` — deterministic, copy-only subject-level splitter with a JSON manifest.
-- `tests/` — fast regression checks for preprocessing and evidence boundaries.
-- `data/` — local dataset copies; excluded from Git because they are large and may have licence restrictions.
-- `outputs/` — local checkpoints and generated metrics/figures; excluded from Git.
-- `latex/` — canonical dissertation source.
-- `docs/` — supporting documentation and a results-status record.
-- `web/` — static research-demo interface served by FastAPI.
+The canonical explanation, affected identifiers, and next steps are in [Results status](docs/RESULTS_STATUS.md). Superseded visual assets are retained under [`docs/archive/`](docs/archive/) with an explicit warning rather than being presented as current evidence.
+
+```mermaid
+flowchart LR
+    A[Local image folders] --> B[Read-only split audit]
+    B -->|audit passes| C[Train or evaluate]
+    B -->|audit fails| D[Provisional evidence boundary]
+    C --> E[Predictions and metrics]
+    E --> F[Figures, dissertation, dashboard]
+    D --> F
+```
+
+## Quick start
+
+```bash
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+
+# Inspect data integrity before interpreting a result.
+venv/bin/python scripts/audit_data.py --output outputs/data_audit.json
+
+# Recreate the current evaluation record and start the local dashboard.
+venv/bin/python evaluate.py --split test
+venv/bin/python api.py
+```
+
+Open [http://localhost:8000](http://localhost:8000) to explore an individual model output, generated evidence, a seeded noise demonstration, batch processing, dataset folders, and project documentation.
+
+## Project map
+
+| Area | Purpose |
+| --- | --- |
+| [`src/`](src/) | Shared PyTorch data, model, training, evaluation, prediction, and FastAPI code. |
+| [`scripts/audit_data.py`](scripts/audit_data.py) | Read-only split and identifier audit. |
+| [`scripts/data_split.py`](scripts/data_split.py) | Deterministic, copy-only subject-level splitter with a JSON manifest. |
+| [`tests/`](tests/) | Regression checks for preprocessing and evidence boundaries. |
+| [`web/`](web/) | Local research workspace served by FastAPI. |
+| [`latex/`](latex/) | Canonical dissertation source and compiled PDF. |
+| [`docs/`](docs/) | Submission-facing documentation, chapters, and supporting analysis. |
+
+`data/` and `outputs/` are local-only because they can be large, licensed, or derived from local checkpoints.
 
 ## Submission artifacts
 
-- `latex/main.pdf` — compiled 32-page canonical dissertation.
-- `docs/presentation/Breast_Cancer_Ultrasound_Dissertation.docx` — editable Word companion.
-- `docs/presentation/Breast_Cancer_Ultrasound_Dissertation_Presentation.pptx` — editable eight-slide viva deck with speaker notes.
-- `Breast_Cancer_Ultrasound_Classification_Dissertation.ipynb` — executed and validated analysis notebook.
+| Artifact | Location |
+| --- | --- |
+| Canonical dissertation | [`latex/main.pdf`](latex/main.pdf) |
+| Editable Word companion | [`Breast_Cancer_Ultrasound_Dissertation.docx`](docs/presentation/Breast_Cancer_Ultrasound_Dissertation.docx) |
+| Editable viva deck with speaker notes | [`Breast_Cancer_Ultrasound_Dissertation_Presentation.pptx`](docs/presentation/Breast_Cancer_Ultrasound_Dissertation_Presentation.pptx) |
+| Executed analysis notebook | [`Breast_Cancer_Ultrasound_Classification_Dissertation.ipynb`](Breast_Cancer_Ultrasound_Classification_Dissertation.ipynb) |
 
-Rebuild the authored outputs after changing source material:
+Rebuild authored artifacts after changing source material:
 
 ```bash
 venv/bin/python scripts/build_notebook.py
 venv/bin/python scripts/execute_notebook.py
 venv/bin/python docs/presentation/build_docx.py
 (cd latex && tectonic --keep-logs main.tex)
-venv/bin/python docs/presentation/build_pptx.py  # requires Codex Desktop's bundled presentation runtime
+venv/bin/python docs/presentation/build_pptx.py  # Requires Codex Desktop's presentation runtime.
 ```
 
 ## Reproducible workflow
 
+Training, evaluation, command-line prediction, and API inference share CLAHE, geometry selection, normalisation, and paired-mask discovery (`_mask.png`, `_tumor.png`, or `_lesion_mask.png`). Evaluation writes `outputs/metrics.json`, `outputs/predictions.csv`, a confusion matrix, and a ROC curve; reported tables should always be generated from those files.
+
 ```bash
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
-venv/bin/python scripts/audit_data.py --output outputs/data_audit.json
-venv/bin/python evaluate.py --split test
 venv/bin/python src/compute_project_tables.py
 venv/bin/python -m unittest discover -s tests -v
-venv/bin/python api.py
 ```
 
-Training and evaluation share CLAHE, resize/crop strategy, normalisation, and paired-mask discovery (`_mask.png`, `_tumor.png`, or `_lesion_mask.png`). Evaluation writes `outputs/metrics.json`, `outputs/predictions.csv`, a confusion matrix, and an ROC curve. Tables must be generated from those files rather than manually entered.
-
-Training refuses a failed data audit by default. For an explicitly provisional engineering run only, the override is:
+Training blocks a failed audit by default. Use the following override only for an explicitly provisional engineering run:
 
 ```bash
 venv/bin/python train.py --model efficientnet_b0 --epochs 25 --seed 42 --allow-unaudited-data
@@ -59,8 +96,8 @@ venv/bin/python train.py --model efficientnet_b0 --epochs 25 --seed 42 --allow-u
 
 ## Before submission
 
-1. Rebuild the dataset at subject level, retaining all views and masks in one split per subject.
-2. Preserve original BUSI identifiers in a manifest; the current renamed `sample_*` files cannot prove patient separation.
-3. Retrain all models on the audited cohort with fixed seeds and save per-run configuration, checkpoint, and predictions.
-4. Replace the provisional Chapter 4 result with generated artifacts from those audited runs.
-5. Compile the LaTeX source and verify every thesis, notebook, DOCX, slide, and dashboard claim against the final metrics and predictions files.
+1. Rebuild the cohort at subject level, keeping every view and mask for a subject in one partition.
+2. Preserve original BUSI identifiers in a manifest; the current `sample_*` names cannot prove patient separation.
+3. Retrain on the audited cohort with fixed seeds and retain configuration, checkpoint, and prediction records.
+4. Regenerate the result chapter, figures, notebook, Word file, slides, and dashboard from that audited evidence.
+5. Verify every final claim against `outputs/metrics.json` and `outputs/predictions.csv`.

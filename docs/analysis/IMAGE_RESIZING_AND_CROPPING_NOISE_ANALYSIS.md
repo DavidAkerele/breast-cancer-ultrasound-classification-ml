@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document specifies how to evaluate image resizing, cropping, CLAHE, and synthetic noise without inventing or manually transcribing results. No completed ablation is claimed. The only current measured checkpoint result is recorded in `outputs/metrics.json` and is limited to the repaired local cohort; it is not clinical validation.
+This document specifies how to evaluate image resizing, cropping, CLAHE, and synthetic noise using saved predictions and recorded configurations. No completed ablation is claimed. The only current measured checkpoint result is recorded in `outputs/metrics.json` and is limited to the repaired local cohort; it is not clinical validation.
 
 ## Preprocessing strategies
 
@@ -55,4 +55,4 @@ Each run should save:
 
 ## Current status
 
-The repaired folders contain subject-level OASBUD and BrEaST partitions with no cross-split subjects; BUSI identifiers remain insufficient for patient-level verification and is excluded from validated runs. The experiment matrix above is therefore a preregistered analysis plan, not a completed ablation results section.
+The repaired folders contain subject-level OASBUD and BrEaST partitions with no cross-split subjects; BUSI identifiers remain insufficient for patient-level verification and is excluded from validated runs. The experiment matrix above is therefore a proposed analysis plan, not a completed ablation results section.

@@ -2,7 +2,7 @@
 
 ## 3.1 Evidence design
 
-The project distinguishes **engineering evidence**, which confirms that the software path executes consistently, from **generalisation evidence**, which estimates performance on independent subjects. The current local cohort supports only the first level because it fails the split-integrity audit.
+The project distinguishes **engineering evidence**, which confirms that the software path executes consistently, from **generalisation evidence**, which estimates performance on independent subjects. The repaired BrEaST and OASBUD cohort passes the subject-level split audit and supports a local held-out estimate. External and clinical validation remain outside the current evidence.
 
 ## 3.2 Data audit
 

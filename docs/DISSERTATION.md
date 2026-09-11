@@ -1,8 +1,8 @@
 # Breast Ultrasound Classification Using Machine Learning
 
-## Dissertation status
+## Project overview
 
-This Markdown document is a companion to the canonical LaTeX dissertation in `latex/`. It records the project’s evidence status accurately: the repository implements a research prototype, but its supplied local cohort has not passed subject-level split validation. It must not be described as a validated diagnostic system.
+This project implements a reproducible research prototype for classifying breast ultrasound images as benign or malignant. It combines subject-level dataset auditing, shared preprocessing, three convolutional neural networks, evaluation outputs and a local web dashboard. The repaired BrEaST and OASBUD partitions pass the subject-level audit. Results describe this local cohort and do not establish clinical effectiveness.
 
 ## Aim
 
@@ -16,17 +16,12 @@ The PyTorch pipeline supports EfficientNet-B0, ResNet-50, and a small custom CNN
 
 The validated loader uses repaired subject-level BrEaST and OASBUD splits with 302 training, 63 validation, and 62 test images. The audit passes for those datasets with no cross-partition subjects. BUSI is excluded because its renamed files do not retain source identifiers. The current EfficientNet-B0 checkpoint achieved 67.74% accuracy, macro F1 0.6774, and ROC-AUC 0.7419 on the held-out test partition. These are local-cohort research results, not clinical validation.
 
-## Required final experiment
+## Limitations and future evaluation
 
-1. Restore the original BUSI manifest before adding BUSI to a validated run.
-2. Preserve every original subject and view identifier in each split manifest.
-3. Freeze the test partition before model selection.
-4. Train with saved seed/configuration/checkpoint metadata.
-5. Save per-image predictions and calculate all tables, intervals, calibration, and figures from those files.
-6. Update the thesis, DOCX, slides, notebook, README, and dashboard from the final artifacts.
+The current comparison uses 62 held-out images and one training seed. Further evaluation should use a frozen subject-level manifest, repeated training seeds, controlled preprocessing ablations, validation-fitted calibration and an independent external cohort. BUSI remains outside the validated experiment because the local derivative lacks verifiable original case identity. The current loader groups normal images with the non-malignant class, a modelling simplification that requires review for any clinical study.
 
 ## Scope and safety
 
 The interface is for research and education. It does not provide a diagnosis, BI-RADS assessment, or clinical decision support. Confidence values and visualisations are model outputs, not clinical certainty.
 
-See [RESULTS_STATUS.md](RESULTS_STATUS.md) for the audit record and `latex/chapters/chapter4.tex` for the dissertation’s formal results statement.
+See [Evaluation results](RESULTS_STATUS.md) for the measured results and evidence limits.

@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
         batch: ["Batch evaluation", "Review multiple model outputs without assigning clinical priority."],
         evidence: ["Evidence record", "Read generated metrics together with the subject-level split audit."],
         dataset: ["Dataset explorer", "Inspect local image folders and their current labels."],
-        documentation: ["Documentation", "Read the submission-facing project record directly from source."],
+        documentation: ["Documentation", "Explore the project, methods, results and research dashboard."],
     };
 
     const state = {

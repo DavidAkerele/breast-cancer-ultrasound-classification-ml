@@ -267,7 +267,7 @@
                 </section>
 
                 <section class="view" id="view-documentation" aria-labelledby="documentationHeading" hidden>
-                    <div class="section-intro"><div><h2 id="documentationHeading">System guide and project record</h2><p>Use boundaries, interface map, literature audit, and submission-facing documentation served from the repository.</p></div></div>
+                    <div class="section-intro"><div><h2 id="documentationHeading">System guide and project record</h2><p>Project overview, methods, evaluation results and instructions for using the research dashboard.</p></div></div>
                     <div class="use-guide" aria-label="Research use guide">
                         <article class="use-card use-card-positive"><span>Appropriate use</span><h3>Research inspection</h3><ul><li>Reproduce local model outputs</li><li>Inspect preprocessing and Grad-CAM</li><li>Review stored metrics and error cases</li></ul></article>
                         <article class="use-card use-card-negative"><span>Unsupported use</span><h3>Clinical decisions</h3><ul><li>No diagnosis or patient triage</li><li>No claim of external generalisation</li><li>No interpretation of confidence as disease probability</li></ul></article>
@@ -279,18 +279,15 @@
                         <article><strong>03</strong><span>Batch</span><small>Labelled examples and CSV export</small></article>
                         <article><strong>04</strong><span>Evidence</span><small>Audit, metrics and generated plots</small></article>
                         <article><strong>05</strong><span>Dataset</span><small>Folder inspection with provenance warning</small></article>
-                        <article><strong>06</strong><span>Documents</span><small>Methods, results and citation audits</small></article>
+                        <article><strong>06</strong><span>Documents</span><small>Methods, results and system guidance</small></article>
                     </div>
                     <div class="document-layout">
                         <nav class="document-list" aria-label="Available documents">
-                            <button type="button" data-document="DISSERTATION.md">Dissertation summary</button>
-                            <button type="button" data-document="RESULTS_STATUS.md">Results status</button>
-                            <button type="button" data-document="MOI_HOON_YAP_LITERATURE_AUDIT.md">Literature audit</button>
-                            <button type="button" data-document="SUPERVISOR_REVISION_CHECKLIST.md">Revision checklist</button>
+                            <button type="button" data-document="DISSERTATION.md">Project overview</button>
+                            <button type="button" data-document="RESULTS_STATUS.md">Evaluation results</button>
                             <button type="button" data-document="USER_MANUAL.md">User manual</button>
-                            <button type="button" data-document="Chapter_3_Methodology.md">Methodology chapter</button>
-                            <button type="button" data-document="TABLE_INTERPRETATION_AND_METHODOLOGY_GUIDE.md">Evidence-table guide</button>
-                            <button type="button" data-document="IMAGE_RESIZING_AND_CROPPING_NOISE_ANALYSIS.md">Ablation protocol</button>
+                            <button type="button" data-document="Chapter_3_Methodology.md">Methodology</button>
+                            <button type="button" data-document="IMAGE_RESIZING_AND_CROPPING_NOISE_ANALYSIS.md">Preprocessing and noise</button>
                         </nav>
                         <article class="markdown-body" id="documentViewer"><p>Choose a document.</p></article>
                     </div>
@@ -307,6 +304,6 @@
             <button class="button primary" value="close">Close</button>
         </form>
     </dialog>
-    <script src="script.js?v=20260910a"></script>
+    <script src="script.js?v=20260922a"></script>
 </body>
 </html>

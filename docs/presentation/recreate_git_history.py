@@ -59,7 +59,7 @@ def recreate_history():
     run_git_cmd(["git", "branch", "-M", "main"])
     
     # 12. Add remote origin
-    run_git_cmd(["git", "remote", "add", "origin", "https://github.com/DavidAkerele/Dissertation.git"])
+    run_git_cmd(["git", "remote", "add", "origin", "https://github.com/DavidAkerele/breast-cancer-ultrasound-classification-ml.git"])
     
     print("\nLocal Git history successfully recreated!")
     print("Run: 'git push -f origin main' to force-push this new timeline to GitHub.")

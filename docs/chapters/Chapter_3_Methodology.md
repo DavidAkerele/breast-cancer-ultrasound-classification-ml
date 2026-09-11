@@ -6,7 +6,7 @@ The project distinguishes **engineering evidence**, which confirms that the soft
 
 ## 3.2 Data audit
 
-The combined loader currently finds 402 training, 107 validation, and 120 test images. OASBUD subject `30nh` spans training and validation; BrEaST cases `case140` and `case151` span partitions; and BUSI patient separation cannot be reconstructed from the renamed files. Training therefore stops by default unless `--allow-unaudited-data` is supplied for an explicitly provisional run.
+The validated loader uses BrEaST and OASBUD only and finds 302 training, 63 validation, and 62 test images after subject-level rebuilding. The audit reports no cross-partition identifiers in either dataset. BUSI patient separation cannot be reconstructed from its renamed files, so it is excluded by default; training still stops if any configured dataset fails its audit unless `--allow-unaudited-data` is supplied for an explicitly provisional run.
 
 The subject-level splitter copies grouped files into deterministic class-stratified partitions and saves a JSON manifest. It never moves the source dataset.
 

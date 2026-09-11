@@ -1,4 +1,6 @@
 """Fast regression tests for evidence and preprocessing boundaries."""
+import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -41,6 +43,26 @@ class EvidenceBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(report["status"], "Research output only")
         self.assertIn("No clinical action", report["action"])
+
+
+class StoredEvidenceTests(unittest.TestCase):
+    def test_primary_prediction_record_excludes_busi(self):
+        prediction_path = Path(config.OUTPUT_DIR) / "predictions.csv"
+        with prediction_path.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 62)
+        self.assertTrue(all("data/busi/" not in row["sample"] for row in rows))
+        self.assertEqual({"breast", "oasbud"}, {
+            "breast" if "data/breast/" in row["sample"] else "oasbud" for row in rows
+        })
+
+    def test_extended_evaluation_matches_stored_predictions(self):
+        path = Path(config.OUTPUT_DIR) / "extended_evaluation.json"
+        record = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(record["overall"]["samples"], 62)
+        self.assertEqual(record["overall"]["confusion_matrix"], [[21, 12], [8, 21]])
+        self.assertEqual(sum(item["samples"] for item in record["by_source"].values()), 62)
+        self.assertEqual(record["positive_class"], "malignant")
 
 
 if __name__ == "__main__":

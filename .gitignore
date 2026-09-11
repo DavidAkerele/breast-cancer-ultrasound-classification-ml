@@ -81,3 +81,33 @@ latex/*.log
 latex/*.lot
 latex/*.out
 latex/*.toc
+
+# University-template build products (the editable source is retained).
+latex_university/*.aux
+latex_university/*.bbl
+latex_university/*.bcf
+latex_university/*.blg
+latex_university/*.lof
+latex_university/*.log
+latex_university/*.lot
+latex_university/*.out
+latex_university/*.run.xml
+latex_university/*.toc
+latex_university/*.xdv
+
+# Local packaging and review workspaces. The final submission package is
+# intentionally kept locally because GitHub rejects files over 100 MB.
+tmp/
+docs/archive/package-builds/*.zip
+*_Overleaf_Ready_*.zip
+latex_university_overleaf*.zip
+latex_university_overleaf_upload_*/
+submission/*_Project_Source.zip
+submission/*_Submission_Package*.zip
+submission/*_Overleaf_Source_DRAFT*.zip
+submission/*_Dissertation_DRAFT*.pdf
+submission/*_Dissertation_Source.docx
+latex_university/report.pdf
+latex_university/TermRef.pdf
+docs/presentation/archive/*.pptx
+docs/presentation/Auditable_Breast_Ultrasound_Dissertation_Presentation.pptx

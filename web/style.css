@@ -445,11 +445,29 @@ tbody tr:hover { background: #f1f6f3; }
 .audit-grid h4 { margin: 0 0 8px; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.06em; }
 .audit-grid p { margin: 3px 0 0; font-size: 0.82rem; }
 .evidence-metrics { margin-bottom: 0; }
+.evidence-secondary { margin-top: 12px; }
+.evidence-secondary dd { font-size: clamp(1.45rem, 3vw, 2.25rem); }
 .evidence-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin: 24px 0; }
 .evidence-figures figure { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; }
 .evidence-figures img { width: 100%; height: auto; }
 .unavailable-panel { padding: 22px 26px; }
 .unavailable-panel ul { margin: 12px 0 0; padding-left: 20px; color: var(--muted); }
+
+.use-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 24px; }
+.use-card { min-height: 210px; padding: 22px; border: 1px solid var(--line); border-top: 4px solid var(--teal); border-radius: var(--radius); background: var(--surface); }
+.use-card-positive { border-top-color: var(--success); }
+.use-card-negative { border-top-color: var(--danger); }
+.use-card > span { color: var(--muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.use-card h3 { margin: 8px 0 16px; font-family: var(--font-display); font-size: 1.55rem; line-height: 1.05; }
+.use-card ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.use-card li + li { margin-top: 7px; }
+
+.interface-map { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 0 0 32px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.interface-map article { display: grid; align-content: start; gap: 3px; min-height: 130px; padding: 16px; }
+.interface-map article + article { border-left: 1px solid var(--line); }
+.interface-map strong { color: var(--teal-dark); font-family: var(--font-display); font-size: 1.45rem; }
+.interface-map span { font-weight: 700; }
+.interface-map small { color: var(--muted); line-height: 1.4; }
 
 .dataset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
 .dataset-summary { margin: 14px 0; color: var(--muted); font-size: 0.8rem; }
@@ -513,12 +531,15 @@ dialog p { margin: 12px 0 24px; color: var(--muted); }
 
 @keyframes pulse { 50% { opacity: 0.45; } }
 
-@media (max-width: 1180px) {
+@media (max-width: 1400px) {
     .topbar { grid-template-columns: 1fr; gap: 14px; }
     .global-controls { justify-content: flex-start; width: max-content; max-width: 100%; }
     .section-intro { align-items: start; flex-direction: column; }
     .button-row { justify-content: flex-start; }
     .stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .interface-map { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .interface-map article:nth-child(4) { border-left: 0; border-top: 1px solid var(--line); }
+    .interface-map article:nth-child(5), .interface-map article:nth-child(6) { border-top: 1px solid var(--line); }
     .stage-grid article:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
     .stage-grid article:nth-child(4) { border-top: 1px solid var(--line); }
 }
@@ -555,7 +576,8 @@ dialog p { margin: 12px 0 24px; color: var(--muted); }
     .button-row, .button-row .button { width: 100%; }
     .image-frame { min-height: 260px; }
     figcaption { align-items: flex-start; flex-direction: column; }
-    .descriptor-grid, .comparison-grid, .control-band, .control-band.compact, .audit-grid, .evidence-figures { grid-template-columns: 1fr; }
+    .descriptor-grid, .comparison-grid, .control-band, .control-band.compact, .audit-grid, .evidence-figures, .use-guide, .interface-map { grid-template-columns: 1fr; }
+    .interface-map article + article, .interface-map article:nth-child(4), .interface-map article:nth-child(5), .interface-map article:nth-child(6) { border-left: 0; border-top: 1px solid var(--line); }
     .stage-grid, .metric-row { grid-template-columns: 1fr; }
     .stage-grid article + article, .stage-grid article:nth-child(3), .stage-grid article:nth-child(4), .metric-row dl + dl { border-left: 0; border-top: 1px solid var(--line); }
     .metric-row dl { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }

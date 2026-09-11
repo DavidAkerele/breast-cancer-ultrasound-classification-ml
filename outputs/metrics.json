@@ -1,0 +1,57 @@
+{
+  "model_name": "efficientnet_b0",
+  "checkpoint": "outputs/efficientnet_b0_model.pth",
+  "split": "test",
+  "samples": 62,
+  "class_names": [
+    "benign",
+    "malignant"
+  ],
+  "generated_at_utc": "2026-09-07T09:08:42.475587+00:00",
+  "data_audit_passed": true,
+  "evidence_status": "validated",
+  "data_audit_sha256": "0885667e79427e5ec431c573a11bf0d28b8cb0770fbe2e9214ce27dacc5bccb9",
+  "preprocessing": {
+    "use_clahe": true,
+    "crop_strategy": "roi_crop",
+    "image_size": 224
+  },
+  "datasets": [
+    "breast",
+    "oasbud"
+  ],
+  "summary": {
+    "accuracy": 0.6774,
+    "macro_f1": 0.6774,
+    "macro_precision": 0.6803,
+    "macro_recall": 0.6803,
+    "balanced_accuracy": 0.6803,
+    "expected_calibration_error": 0.0652,
+    "bootstrap_95_ci": {
+      "accuracy": [
+        0.5645,
+        0.7903
+      ],
+      "macro_f1": [
+        0.5589,
+        0.7889
+      ],
+      "roc_auc": [
+        0.6217,
+        0.8616
+      ]
+    },
+    "roc_auc": 0.7419
+  },
+  "confusion_matrix": [
+    [
+      21,
+      12
+    ],
+    [
+      8,
+      21
+    ]
+  ],
+  "predictions_file": "outputs/predictions.csv"
+}

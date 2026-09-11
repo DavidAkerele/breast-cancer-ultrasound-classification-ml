@@ -38,19 +38,29 @@ def audit_dataset(root, dataset):
     }
 
 
-def build_report(root):
-    """Return the canonical data-readiness report used by training and evaluation."""
-    report = {dataset: audit_dataset(root, dataset) for dataset in ("busi", "oasbud", "breast")}
+def build_report(root, datasets=None):
+    """Return the canonical data-readiness report used by training and evaluation.
+
+    With no selection, every local dataset is reported. A valid experiment may
+    explicitly audit only datasets whose subject identifiers are recoverable.
+    """
+    selected = tuple(datasets or ("busi", "oasbud", "breast"))
+    unknown = set(selected) - {"busi", "oasbud", "breast"}
+    if unknown:
+        raise ValueError(f"Unknown dataset(s): {', '.join(sorted(unknown))}")
+    report = {dataset: audit_dataset(root, dataset) for dataset in selected}
     failed = [
         dataset
         for dataset, result in report.items()
         if not result["subject_ids_verifiable"] or result["cross_split_subjects"]
     ]
     report["audit_passed"] = not failed
+    report["audited_datasets"] = list(selected)
     report["failed_datasets"] = failed
     report["notes"] = [
         "BUSI filenames were renamed during curation, so patient-level separation cannot be verified from this copy.",
         "A non-empty cross_split_subjects section invalidates a patient-independent estimate until the cohort is rebuilt.",
+        "A dataset omitted from an experiment must not be described as part of that experiment's evidence.",
     ]
     return report
 
@@ -58,10 +68,12 @@ def build_report(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--datasets", nargs="+", choices=("busi", "oasbud", "breast"),
+                        help="Datasets included in this experiment; default audits all local datasets.")
     parser.add_argument("--output", help="Optional JSON report path")
     args = parser.parse_args()
     root = Path(args.data_dir)
-    report = build_report(root)
+    report = build_report(root, args.datasets)
     text = json.dumps(report, indent=2, sort_keys=True, default=dict)
     if args.output:
         Path(args.output).write_text(text + "\n", encoding="utf-8")

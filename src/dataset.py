@@ -189,7 +189,7 @@ def get_transforms():
 
     return train_transform, val_transform
 
-def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0, combine=True):
+def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0, combine=True, datasets=None):
     """
     Creates DataLoaders for train, val, and test splits.
     Also computes class weights for loss balancing if dataset is imbalanced.
@@ -197,7 +197,7 @@ def get_dataloaders(batch_size=config.BATCH_SIZE, num_workers=0, combine=True):
     train_transform, val_transform = get_transforms()
 
     if combine:
-        datasets_to_load = ["busi", "breast", "oasbud"]
+        datasets_to_load = tuple(datasets or config.TRAIN_DATASETS)
         train_samples = []
         val_samples = []
         test_samples = []

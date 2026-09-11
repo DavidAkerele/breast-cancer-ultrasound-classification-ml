@@ -33,9 +33,9 @@ def set_reproducible_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def audit_training_data(allow_unaudited):
+def audit_training_data(allow_unaudited, datasets):
     """Write the split audit and refuse training unless the risk is explicit."""
-    report = build_report(Path(config.DATA_DIR))
+    report = build_report(Path(config.DATA_DIR), datasets)
     audit_path = Path(config.OUTPUT_DIR) / "data_audit.json"
     audit_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if not report["audit_passed"] and not allow_unaudited:
@@ -103,7 +103,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=config.BATCH_SIZE, help="Batch size")
     parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="Learning rate")
     parser.add_argument("--combine", action=argparse.BooleanOptionalAction, default=True,
-                        help="Combine multiple datasets for training (use --no-combine for the active dataset only)")
+                        help="Combine the configured auditable datasets (use --no-combine for the active dataset only)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed recorded in the checkpoint")
     parser.add_argument(
         "--allow-unaudited-data",
@@ -113,17 +113,19 @@ def main():
     args = parser.parse_args()
 
     set_reproducible_seed(args.seed)
-    audit_report = audit_training_data(args.allow_unaudited_data)
+    selected_datasets = config.TRAIN_DATASETS if args.combine else (config.ACTIVE_DATASET,)
+    audit_report = audit_training_data(args.allow_unaudited_data, selected_datasets)
 
     print(f"--- Starting Training Pipeline on Device: {config.DEVICE} ---")
     
     # Check if data exists
     if args.combine:
-        breast_dir = os.path.join(config.DATA_DIR, "breast", "train")
-        oasbud_dir = os.path.join(config.DATA_DIR, "oasbud", "train")
-        if (not os.path.exists(breast_dir) or len(os.listdir(breast_dir)) == 0) and \
-           (not os.path.exists(oasbud_dir) or len(os.listdir(oasbud_dir)) == 0):
-            print("[WARNING] Combined training datasets (BrEaST / OASBUD) are empty or missing.")
+        missing = [
+            dataset for dataset in selected_datasets
+            if not os.path.isdir(os.path.join(config.DATA_DIR, dataset, "train"))
+        ]
+        if missing:
+            print(f"[WARNING] Configured training datasets are missing: {', '.join(missing)}")
     else:
         if not os.path.exists(config.TRAIN_DIR) or len(os.listdir(config.TRAIN_DIR)) == 0:
             print(f"[WARNING] Training directory {config.TRAIN_DIR} is empty or missing.")
@@ -131,7 +133,9 @@ def main():
             from scripts.create_dummy_data import create_dummy_dataset
             create_dummy_dataset()
 
-    train_loader, val_loader, _, class_weights = get_dataloaders(batch_size=args.batch_size, combine=args.combine)
+    train_loader, val_loader, _, class_weights = get_dataloaders(
+        batch_size=args.batch_size, combine=args.combine, datasets=selected_datasets
+    )
     print(f"Loaded {len(train_loader.dataset)} training samples and {len(val_loader.dataset)} validation samples.")
 
     model = get_model(model_name=args.model, num_classes=config.NUM_CLASSES, pretrained=True)
@@ -144,12 +148,31 @@ def main():
 
     best_val_loss = float("inf")
     patience_counter = 0
+    history = []
+    history_path = Path(config.OUTPUT_DIR) / f"training_history_{args.model}.json"
 
     start_time = time.time()
     for epoch in range(1, args.epochs + 1):
         print(f"\nEpoch {epoch}/{args.epochs}")
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, config.DEVICE)
         val_loss, val_acc = validate(model, val_loader, criterion, config.DEVICE)
+
+        history.append({
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "train_accuracy": train_acc,
+            "validation_loss": val_loss,
+            "validation_accuracy": val_acc,
+            "learning_rate": optimizer.param_groups[0]["lr"],
+        })
+        history_path.write_text(json.dumps({
+            "model_name": args.model,
+            "seed": args.seed,
+            "datasets": list(selected_datasets),
+            "crop_strategy": config.CROP_STRATEGY,
+            "use_clahe": config.USE_CLAHE,
+            "epochs": history,
+        }, indent=2) + "\n", encoding="utf-8")
         scheduler.step()
 
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc*100:.2f}%")
@@ -173,11 +196,13 @@ def main():
                     'learning_rate': args.lr,
                     'epochs_requested': args.epochs,
                     'combined_datasets': args.combine,
+                    'datasets': list(selected_datasets),
                     'crop_strategy': config.CROP_STRATEGY,
                     'use_clahe': config.USE_CLAHE,
                     'created_at_utc': datetime.now(timezone.utc).isoformat(),
                 },
                 'data_audit_passed': audit_report['audit_passed'],
+                'training_history': list(history),
             }
             torch.save(checkpoint_data, config.CHECKPOINT_PATH)
             if args.model in config.MODEL_CHECKPOINT_PATHS:

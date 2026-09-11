@@ -1,0 +1,132 @@
+\chapter[Data Audit and Reproducibility]{Data Audit and Reproducibility Record}
+\label{app:app1}
+
+\section{Purpose of this record}
+
+This appendix connects the numerical results in Chapter~\ref{ch:results} to the files and commands that produced them. It records the cohort used by the validated experiment, the subject separation rule, the stored outputs, and the limits on reproduction. The record is included because a checkpoint alone is not enough to reconstruct an experiment. A reviewer also needs to know which images entered each partition, how labels were mapped, which preprocessing path was active, and which evaluator generated the reported values.
+
+The primary run used the repaired BrEaST and OASBUD folders. Their filenames retain identifiers that can be grouped at subject level. The audit found no subject identifier in more than one of the training, validation, and test partitions. BUSI was omitted from the validated run because the local files had been renamed to generated identifiers. Without the original manifest, the repository cannot establish whether two BUSI images belong to the same patient. This exclusion reduces the available sample size, but it prevents an unverifiable dataset from being presented as independent test evidence.
+
+\section{Audited cohort snapshot}
+
+Table~\ref{tab:appendix_audit_counts} reproduces the class counts from \path{outputs/data_audit.json}. The normal BrEaST images are loaded as non-malignant examples because the executable task has two output classes. This mapping is explicit in the dataset loader and should be reviewed before a later clinical study because a normal image and a benign lesion do not express the same clinical condition.
+
+\begin{table}[H]
+\centering
+\caption{Audited image counts used by the validated experiment.}
+\label{tab:appendix_audit_counts}
+\small
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Partition} & \textbf{Benign} & \textbf{Malignant} & \textbf{Normal} & \textbf{Total} \\
+\midrule
+BrEaST & Training & 101 & 60 & 3 & 164 \\
+BrEaST & Validation & 19 & 13 & 1 & 33 \\
+BrEaST & Test & 19 & 13 & 0 & 32 \\
+OASBUD & Training & 66 & 72 & 0 & 138 \\
+OASBUD & Validation & 14 & 16 & 0 & 30 \\
+OASBUD & Test & 14 & 16 & 0 & 30 \\
+\midrule
+Combined & Training & 167 & 132 & 3 & 302 \\
+Combined & Validation & 33 & 29 & 1 & 63 \\
+Combined & Test & 33 & 29 & 0 & 62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The audit uses a dataset-specific identifier rule. For BrEaST, it retains the \texttt{caseNNN} prefix. For OASBUD, it removes the suffix that identifies different views of the same lesion. It then builds a mapping from each derived identifier to every partition in which that identifier appears. An audit passes only when the identifiers are recoverable and each identifier occurs in one partition. The stored report records \texttt{audit\_passed: true}, lists \texttt{breast} and \texttt{oasbud} as the audited datasets, and contains an empty \texttt{cross\_split\_subjects} object for both.
+
+\section{Experiment configuration}
+
+The validated checkpoint uses EfficientNet-B0 with a two-output classifier. The input pipeline applies CLAHE, uses the padded region-of-interest crop, resizes the result to $224\times224$ pixels, and normalises the three channels with the ImageNet mean and standard deviation used by the transfer-learning backbone. Training uses batch size 16, an initial learning rate of $10^{-4}$, weight decay of $10^{-4}$, class-weighted cross-entropy, and seed 42. The maximum epoch budget is 25, with early stopping after five validation epochs without improvement in validation loss.
+
+Evaluation loads the selected checkpoint without downloading new pretrained weights. It applies no random test augmentation and writes one row per test image. The stored primary result contains 62 rows, with 33 benign or non-malignant labels and 29 malignant labels. The confusion matrix is
+
+\begin{equation}
+\begin{bmatrix}
+21 & 12 \\
+8 & 21
+\end{bmatrix},
+\end{equation}
+
+where rows are true classes and columns are predicted classes in the order benign, malignant. These counts yield 42 correct predictions and 20 errors. The corresponding summary is 0.6774 accuracy, 0.6774 macro F1, 0.6803 macro recall, 0.7419 ROC-AUC, and 0.0652 expected calibration error. The evaluator also records bootstrap 95\% intervals of 0.5645 to 0.7903 for accuracy, 0.5589 to 0.7889 for macro F1, and 0.6217 to 0.8616 for ROC-AUC.
+
+\section{Reproduction sequence}
+
+The following commands are run from the repository root with the project environment active. They are shown on separate lines so that paths remain readable in the printed report.
+
+\begin{verbatim}
+venv/bin/python scripts/audit_data.py \
+  --datasets breast oasbud \
+  --output outputs/data_audit.json
+
+venv/bin/python train.py \
+  --model efficientnet_b0 \
+  --epochs 25 --batch-size 16 --lr 0.0001 --seed 42
+
+venv/bin/python evaluate.py \
+  --checkpoint outputs/efficientnet_b0_model.pth \
+  --split test
+
+venv/bin/python scripts/benchmark_models.py \
+  --split test \
+  --models efficientnet_b0 resnet50 custom_cnn
+
+venv/bin/python scripts/generate_report_figures.py
+\end{verbatim}
+
+Training invokes the audit before the first optimisation step. If the selected dataset fails, the command stops unless the author explicitly supplies \texttt{-{}-allow-unaudited-data}. That override marks an engineering run; it must not be used to support the validated headline result. The evaluation step reloads the model architecture named inside the checkpoint, loads its stored state dictionary, uses the configured datasets, and writes the result bundle described below.
+
+\section{Stored evidence bundle}
+
+Table~\ref{tab:appendix_artifacts} lists the files required to trace the reported result. The files should be retained together because replacing only one item can leave plots, predictions, and summary values referring to different runs.
+
+\begin{table}[H]
+\centering
+\caption{Primary reproducibility artefacts retained by the project.}
+\label{tab:appendix_artifacts}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.31\textwidth}X@{}}
+\toprule
+\textbf{Artefact} & \textbf{Role in the evidence chain} \\
+\midrule
+\path{outputs/data_audit.json} & Dataset selection, partition counts, identifier status, audit outcome, and exclusions. \\
+\path{outputs/efficientnet_b0_model.pth} & EfficientNet-B0 checkpoint evaluated for the primary result. \\
+\path{outputs/predictions.csv} & Test-image path, true label, predicted label, and malignant-class probability. \\
+\path{outputs/metrics.json} & Aggregate metrics, confusion matrix, uncertainty intervals, preprocessing configuration, generation time, and audit checksum. \\
+\path{outputs/model_benchmark.json} & Same-split comparison of EfficientNet-B0, ResNet-50, and the custom CNN. \\
+\path{outputs/extended_evaluation.json} & Average precision, Brier score, class-level results, and source-stratified results derived from the stored primary predictions. \\
+\path{outputs/confusion_matrix.png} & Matrix generated from the stored test predictions. \\
+\path{outputs/roc_curve.png} & ROC curve generated from malignant-class probabilities. \\
+\path{scripts/generate_report_figures.py} & Rebuilds dataset composition, architecture comparison, uncertainty, dataset-quality, and image-level prediction figures from local evidence. \\
+\path{figures/fig11_web_interface.png} & Browser capture of the implemented dashboard state reproduced in Figure~\ref{fig:web_interface}. \\
+\path{figures/fig14_web_interface_tour.png} & Six-screen browser capture showing the implemented research workflow and use boundaries in Figure~\ref{fig:web_interface_tour}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The metrics record includes a SHA-256 checksum for the audit file associated with the result:
+
+\begin{center}
+\small\ttfamily
+0885667e79427e5ec431c573a11bf0d28\\
+b8cb0770fbe2e9214ce27dacc5bccb9
+\end{center}
+
+This checksum links the summary to one audit output. It does not replace checksums for the source images, checkpoint, environment, or repository revision. A future release should store those values in a run-specific directory so that later experiments cannot overwrite the evidence used in the dissertation.
+
+\section{Independent checks and remaining limits}
+
+The automated test suite checks six software contracts: every crop strategy returns the configured model dimensions, mask discovery recognises the supported suffixes, an unaudited result is labelled as provisional, the API does not recommend clinical action, the primary prediction record excludes BUSI, and the extended evaluation agrees with the stored sample count and confusion matrix. These tests guard against accidental software changes. They do not measure diagnostic safety or external validity.
+
+Reproduction also depends on the software environment and hardware. The seed fixes the intended random streams in Python, NumPy, PyTorch, and CUDA where available, but library versions and non-deterministic kernels can still change the fitted weights. A faithful rerun should therefore record the operating system, Python version, PyTorch and torchvision versions, device type, dependency lock, Git revision, and checkpoint checksum. The current appendix provides the executable path and stored result; it does not claim bitwise identity on every machine.
+
+The test sample is small and comes from two local public-data preparations. No independent hospital cohort, prospective reader study, or clinical workflow evaluation was performed. The metrics describe this audited local partition only. The wide bootstrap intervals and overlapping architecture intervals should remain visible whenever the result is presented.
+
+\section{Post-hoc evaluation record}
+
+The additional precision-recall, reliability, and source-stratified analyses use only the 62 rows in \path{outputs/predictions.csv}. The malignant class is the positive class and the stored classification uses a threshold of 0.5. No observation was removed, relabelled, or reweighted for these plots. The analysis writes \path{outputs/extended_evaluation.json} so the values printed in Chapter~\ref{ch:results} can be checked without reading values from the image.
+
+The source check identifies 32 BrEaST images and 30 OASBUD images from their stored relative paths. It is exploratory because each subset is small and the two sources differ in acquisition and reconstruction. The calculation is still useful: it shows that the pooled result combines different error profiles. Any later external study should retain the source field explicitly rather than recovering it from a path.
+
+The old checkpoints do not contain per-epoch histories. Their selected epochs and validation summaries are reported, but a full loss or accuracy curve would require information that was not saved. The revised training code stores that history for future experiments. It does not retroactively create evidence for the completed runs.

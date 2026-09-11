@@ -28,11 +28,11 @@ ABSTRACT = (
     "configurable CLAHE, aspect-ratio-preserving square padding, machine-readable evaluation artifacts, and a "
     "FastAPI research interface. Its principal contribution is methodological: training, evaluation, command-line "
     "prediction, and API inference share one preprocessing path, while a read-only audit checks subject-level split "
-    "integrity before metrics are interpreted. The supplied local cohort does not pass that audit. OASBUD and BrEaST "
-    "subjects cross partitions, and renamed BUSI files do not retain enough provenance to verify patient separation. "
-    "The bundled EfficientNet-B0 checkpoint achieved 78.33% accuracy and ROC-AUC 0.8612 on the current 120-image test "
-    "folders; these values are provisional engineering evidence only. A defensible study requires a rebuilt subject-level "
-    "cohort, preserved manifests, fixed seeds, stored per-image predictions, and regenerated tables and figures."
+    "integrity before metrics are interpreted. The supplied OASBUD and BrEaST folders have been rebuilt into subject-level "
+    "splits with no cross-partition identifiers. BUSI remains excluded because its renamed files do not retain enough "
+    "provenance to verify patient separation. The fresh EfficientNet-B0 checkpoint achieved 67.74% accuracy, macro F1 "
+    "0.6774, and ROC-AUC 0.7419 on 62 held-out BrEaST and OASBUD images. These are local-cohort research results only, "
+    "not clinical or external validation."
 )
 
 DECLARATION = (
@@ -142,7 +142,7 @@ def add_title_page(doc):
     paragraph = doc.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     paragraph.paragraph_format.space_before = Pt(44)
-    run = paragraph.add_run("BREAST ULTRASOUND CLASSIFICATION\nUSING DEEP LEARNING")
+    run = paragraph.add_run("BREAST CANCER ULTRASOUND CLASSIFICATION\nUSING MACHINE LEARNING")
     run.font.name = "Aptos Display"
     run.font.size = Pt(27)
     run.font.bold = True
@@ -151,7 +151,7 @@ def add_title_page(doc):
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     subtitle.paragraph_format.space_before = Pt(20)
-    run = subtitle.add_run("A reproducibility-focused study of preprocessing,\nconvolutional models, and evidence integrity")
+    run = subtitle.add_run("An auditable study of preprocessing, convolutional models,\nand evidence integrity")
     run.font.name = "Times New Roman"
     run.font.size = Pt(15)
     run.font.italic = True
@@ -181,7 +181,7 @@ def add_title_page(doc):
     r = p.add_run("EVIDENCE STATUS · PROVISIONAL\n")
     r.bold = True
     r.font.color.rgb = RGBColor(101, 71, 5)
-    p.add_run("The current cohort fails the subject-level split audit.\nThis document makes no clinical-performance claim.")
+    p.add_run("BrEaST and OASBUD pass the subject-level split audit; BUSI is excluded because its patient identifiers are unavailable.\nThis document makes no clinical-performance claim.")
     doc.add_page_break()
 
 
@@ -333,8 +333,8 @@ def add_markdown_file(doc, path):
 def add_figures(doc):
     doc.add_heading("Generated evaluation figures", level=2)
     for filename, caption in [
-        ("confusion_matrix.png", "Figure 1. Confusion matrix for the provisional 120-image checkpoint run."),
-        ("roc_curve.png", "Figure 2. Receiver operating characteristic for the same provisional run."),
+        ("confusion_matrix.png", "Figure 1. Confusion matrix for the audited 62-image checkpoint run."),
+        ("roc_curve.png", "Figure 2. Receiver operating characteristic for the same audited run."),
     ]:
         path = ROOT / "outputs" / filename
         if not path.exists():

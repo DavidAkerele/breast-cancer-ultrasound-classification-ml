@@ -23,10 +23,47 @@ except ImportError:
 
 from scripts.audit_data import build_report
 
+
+def expected_calibration_error(labels, probs, bins=10):
+    """Return equal-width expected calibration error for binary probabilities."""
+    confidences = np.maximum(probs, 1.0 - probs)
+    predictions = (probs >= 0.5).astype(int)
+    edges = np.linspace(0.0, 1.0, bins + 1)
+    error = 0.0
+    for lower, upper in zip(edges[:-1], edges[1:]):
+        mask = (confidences >= lower) & (confidences < upper if upper < 1.0 else confidences <= upper)
+        if np.any(mask):
+            error += float(np.mean(mask)) * abs(float(np.mean(predictions[mask] == labels[mask])) - float(np.mean(confidences[mask])))
+    return round(error, 4)
+
+
+def bootstrap_interval(labels, preds, probs, metric, seed=42, iterations=1000):
+    """Return a percentile bootstrap 95% interval for a metric."""
+    rng = np.random.default_rng(seed)
+    values = []
+    n = len(labels)
+    for _ in range(iterations):
+        indices = rng.integers(0, n, n)
+        sample_labels, sample_preds = labels[indices], preds[indices]
+        if metric == "accuracy":
+            values.append(accuracy_score(sample_labels, sample_preds))
+        elif metric == "macro_f1":
+            values.append(f1_score(sample_labels, sample_preds, average="macro", zero_division=0))
+        elif metric == "roc_auc" and len(np.unique(sample_labels)) == 2:
+            values.append(roc_auc_score(sample_labels, probs[indices]))
+    if not values:
+        return None
+    return [round(float(np.percentile(values, 2.5)), 4), round(float(np.percentile(values, 97.5)), 4)]
+
 @torch.no_grad()
 def evaluate():
     parser = argparse.ArgumentParser(description="Evaluate Trained Breast Cancer Ultrasound Model")
-    parser.add_argument("--checkpoint", type=str, default=config.CHECKPOINT_PATH, help="Path to model checkpoint")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=config.EVALUATION_CHECKPOINT_PATH,
+        help="Path to model checkpoint (defaults to the audited EfficientNet-B0 checkpoint)",
+    )
     parser.add_argument("--split", type=str, default="test", choices=["val", "test"], help="Dataset split to evaluate")
     args = parser.parse_args()
 
@@ -42,7 +79,9 @@ def evaluate():
     model = model.to(config.DEVICE)
     model.eval()
 
-    _, val_loader, test_loader, _ = get_dataloaders(batch_size=config.BATCH_SIZE)
+    _, val_loader, test_loader, _ = get_dataloaders(
+        batch_size=config.BATCH_SIZE, datasets=config.TRAIN_DATASETS
+    )
     eval_loader = test_loader if args.split == "test" else val_loader
 
     if len(eval_loader.dataset) == 0:
@@ -75,6 +114,12 @@ def evaluate():
         "macro_f1": round(float(f1_score(all_labels, all_preds, average="macro", zero_division=0)), 4),
         "macro_precision": round(float(precision_score(all_labels, all_preds, average="macro", zero_division=0)), 4),
         "macro_recall": round(float(recall_score(all_labels, all_preds, average="macro", zero_division=0)), 4),
+    }
+    summary["balanced_accuracy"] = round(float((recall_score(all_labels, all_preds, pos_label=0) + recall_score(all_labels, all_preds, pos_label=1)) / 2), 4)
+    summary["expected_calibration_error"] = expected_calibration_error(all_labels, all_probs)
+    summary["bootstrap_95_ci"] = {
+        metric: bootstrap_interval(all_labels, all_preds, all_probs, metric)
+        for metric in ("accuracy", "macro_f1", "roc_auc")
     }
 
     # Print Classification Report
@@ -116,7 +161,7 @@ def evaluate():
         plt.close()
         print(f"Saved ROC Curve to: {roc_path}")
 
-    audit_report = build_report(Path(config.DATA_DIR))
+    audit_report = build_report(Path(config.DATA_DIR), config.TRAIN_DATASETS)
     audit_text = json.dumps(audit_report, indent=2, sort_keys=True) + "\n"
     audit_path = os.path.join(config.OUTPUT_DIR, "data_audit.json")
     with open(audit_path, "w", encoding="utf-8") as f:
@@ -152,6 +197,7 @@ def evaluate():
                 "crop_strategy": config.CROP_STRATEGY,
                 "image_size": config.IMG_SIZE,
             },
+            "datasets": list(config.TRAIN_DATASETS),
             "summary": summary,
             "confusion_matrix": cm.tolist(),
             "predictions_file": os.path.relpath(predictions_path, config.BASE_DIR),

@@ -75,14 +75,18 @@ def load_model_if_needed():
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
-    if not os.path.exists(config.CHECKPOINT_PATH):
-        raise RuntimeError("No trained model checkpoint is available. Train a model or provide outputs/best_ultrasound_model.pth.")
+    checkpoint_path = config.EVALUATION_CHECKPOINT_PATH
+    if not os.path.exists(checkpoint_path):
+        raise RuntimeError(
+            "The audited EfficientNet-B0 checkpoint is unavailable. "
+            "Provide outputs/efficientnet_b0_model.pth or set EVALUATION_CHECKPOINT_PATH."
+        )
 
     try:
-        mtime = os.path.getmtime(config.CHECKPOINT_PATH)
+        mtime = os.path.getmtime(checkpoint_path)
         if model is None or mtime > last_loaded_mtime:
-            print(f"Loading/Reloading checkpoint from: {config.CHECKPOINT_PATH} (mtime={mtime})")
-            checkpoint = torch.load(config.CHECKPOINT_PATH, map_location=config.DEVICE)
+            print(f"Loading/Reloading checkpoint from: {checkpoint_path} (mtime={mtime})")
+            checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE)
             model_name = checkpoint.get("model_name", "custom_cnn")
             
             temp_model = get_model(model_name=model_name, num_classes=config.NUM_CLASSES, pretrained=False)
@@ -587,6 +591,8 @@ async def predict_ultrasound(
         pred_idx = torch.argmax(probabilities).item()
     pred_class = config.CLASS_NAMES[pred_idx]
     confidence = float(probabilities[pred_idx].item())
+    abstained = confidence < config.ABSTAIN_CONFIDENCE
+    surfaced_prediction = "uncertain" if abstained else pred_class
     prob_dict = {config.CLASS_NAMES[i]: float(probabilities[i].item()) for i in range(config.NUM_CLASSES)}
 
     # Compute Grad-CAM Saliency Heatmap
@@ -616,7 +622,14 @@ async def predict_ultrasound(
     return {
         "filename": filename,
         "ground_truth": gt_label,
-        "prediction": pred_class.upper(),
+        "prediction": surfaced_prediction.upper(),
+        "model_prediction": pred_class.upper(),
+        "abstained": abstained,
+        "abstention_reason": (
+            f"Maximum model probability ({confidence:.2f}) is below the configured "
+            f"research threshold ({config.ABSTAIN_CONFIDENCE:.2f})."
+            if abstained else None
+        ),
         "confidence": round(confidence * 100, 2),
         "probabilities": {k: round(v * 100, 2) for k, v in prob_dict.items()},
         "original_image": original_b64,
@@ -739,10 +752,22 @@ def get_dissertation_benchmarks():
         raise HTTPException(status_code=404, detail="No evaluated metrics are available. Run evaluate.py first.")
     with open(metrics_path, "r", encoding="utf-8") as f:
         metrics = json.load(f)
+    extended_path = os.path.join(config.OUTPUT_DIR, "extended_evaluation.json")
+    benchmark_path = os.path.join(config.OUTPUT_DIR, "model_benchmark.json")
+    extended = None
+    benchmark = None
+    if os.path.exists(extended_path):
+        with open(extended_path, "r", encoding="utf-8") as f:
+            extended = json.load(f)
+    if os.path.exists(benchmark_path):
+        with open(benchmark_path, "r", encoding="utf-8") as f:
+            benchmark = json.load(f)
     return {
         "status": "single evaluation run; do not treat as clinical validation",
         "metrics": metrics,
-        "unavailable": ["pseudo-label ablation", "multi-model comparison", "noise benchmark"],
+        "extended_evaluation": extended,
+        "model_benchmark": benchmark,
+        "unavailable": ["multi-seed training", "external clinical validation", "measured cohort noise benchmark"],
     }
 
 
@@ -759,7 +784,15 @@ def get_data_audit():
 @app.get("/api/evidence/{filename}")
 def get_evidence_file(filename: str):
     """Serve only generated, non-sensitive evaluation summaries and figures."""
-    allowed = {"metrics.json", "data_audit.json", "confusion_matrix.png", "roc_curve.png"}
+    allowed = {
+        "metrics.json",
+        "data_audit.json",
+        "extended_evaluation.json",
+        "confusion_matrix.png",
+        "roc_curve.png",
+        "discrimination_calibration.png",
+        "source_stratified_performance.png",
+    }
     if filename not in allowed:
         raise HTTPException(status_code=404, detail="Evidence file not found.")
     path = os.path.join(config.OUTPUT_DIR, filename)

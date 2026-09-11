@@ -1,0 +1,117 @@
+\usepackage{ifthen}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage[usenames]{xcolor}
+\usepackage{pdfpages}
+\usepackage{subfigure}
+\usepackage{url} 
+
+\usepackage{epsfig} 
+\usepackage{tabls}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\interdisplaylinepenalty=2500
+
+\usepackage{multicol}
+\usepackage{colortbl}
+\usepackage{pdfcolmk}
+%\usepackage{natbib}
+\usepackage[style=authoryear,backend=bibtex,dashed=false]{biblatex}
+\addbibresource{refs.bib}
+% Compatibility aliases for the dissertation chapters.
+\let\citep\parencite
+\let\citet\textcite
+
+\usepackage{times}
+\usepackage{amsfonts}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{microtype}
+\usepackage{titlesec}
+\emergencystretch=1.5em
+\hyphenpenalty=4000
+\exhyphenpenalty=4000
+
+% Keep the MMU binding margin while making the remaining page margins explicit.
+\setlength{\oddsidemargin}{15truemm}
+\setlength{\evensidemargin}{0truemm}
+\setlength{\textwidth}{145truemm}
+\setlength{\topmargin}{0truemm}
+\setlength{\textheight}{224truemm}
+\setlength{\headsep}{10truemm}
+
+% Use consistent dissertation spacing and avoid vertically stretched paragraphs.
+\AtBeginDocument{%
+  \onehalfspacing
+  \setlength{\parindent}{1.5em}%
+  \setlength{\parskip}{0pt plus 0.2pt}%
+  \raggedbottom
+}
+
+% The base report class inserts a large blank area above chapter headings.
+% Place numbered and unnumbered chapter titles at the top text margin instead.
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\raggedright}
+  {\chaptertitlename\ \thechapter}
+  {8pt}
+  {\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{22pt}
+\titlespacing*{\section}{0pt}{1.6\baselineskip}{0.55\baselineskip}
+\titlespacing*{\subsection}{0pt}{1.2\baselineskip}{0.4\baselineskip}
+
+
+\definecolor{MyBlack}{rgb}{0,0,0}
+\definecolor{MyGray}{rgb}{0.5,0.5,0.5} 
+\definecolor{MyBlue}{rgb}{0,0.4,1}
+\definecolor{MyLightBlue}{rgb}{0,0.8,0.7}
+
+\providecommand{\pt}{\cellcolor{MyBlack}}
+\providecommand{\st}{\cellcolor{MyGray}}
+
+\providecommand{\bt}{\cellcolor{MyBlue}}
+\providecommand{\lt}{\cellcolor{MyLightBlue}}
+
+\usepackage{array}
+
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[pdftex,hypertexnames=false]{hyperref}
+\else
+  \usepackage[xetex,hypertexnames=false]{hyperref}
+\fi
+
+%% *** Do not adjust lengths that control margins, column widths, etc. ***
+%% *** Do not use packages that alter fonts (such as pslatex).         ***
+%% There should be no need to do such things with IEEEtran.cls V1.6 and later.
+%%page layout
+%%\usepackage{layout}
+%%
+%%resetting
+%%\setlength{\hoffset}{-1in}
+%%\setlength{\voffset}{-1in}
+%%
+%%gap between columns
+%%\setlength{\columnsep}{10mm}
+%%gap above header
+%%\setlength{\topmargin}{1in}
+%%between header and text
+%%\setlength{\topskip}{0cm}
+%%height of main text
+%%\setlength{\textheight}{8in}
+%% width of text
+%%\setlength{\textwidth}{5.5in}
+%%odd page left margin
+%%\setlength{\oddsidemargin}{1.5in}
+%%even page left margin
+%%\setlength{\evensidemargin}{4cm}
+%%\setlength{\headheight}{0mm}
+%%\setlength{\marginparsep}{0mm}
+%%\setlength{\marginparwidth}{0mm}
+%%\setlength{\headsep}{0mm}
+%%bottom margin
+%%\setlength{\footskip}{0cm}
+
+\addtocounter{MaxMatrixCols}{20}

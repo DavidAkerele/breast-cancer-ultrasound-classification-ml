@@ -9,35 +9,35 @@ The project follows an implementation-and-evaluation design. Its primary unit of
     \item[Generalisation evidence] estimates performance on subjects independent of model development and requires verified subject-level separation, preserved provenance, and a frozen test set.
 \end{description}
 
-The current repository supports the first level. Because the supplied local cohort fails the split audit, results from it are marked provisional throughout.
+The current repository supports the first level. The repaired BrEaST and OASBUD cohort passes the split audit, while BUSI is excluded until its original identifiers are restored. Results remain local-cohort research evidence rather than clinical validation.
 
 \section{Data sources and label mapping}
 The local project combines organised copies of BUSI, OASBUD, and BrEaST. BUSI is a public B-mode image dataset with normal, benign, and malignant labels and lesion masks \citep{AlDhabyani2020}. OASBUD contains multiple views per lesion \citep{Piotrzkowska2017}. The BrEaST copy uses case identifiers and includes a small normal subset.
 
 The configured task is binary: \texttt{benign} and \texttt{malignant}. Files in a \texttt{normal} directory are mapped to the non-malignant class by the loader. This makes the executable task consistent but collapses clinically different categories, so the decision must be reviewed and predeclared before a definitive experiment.
 
-The combined loader currently finds the counts in Table~\ref{tab:local_counts}. Mask files are excluded from the image count.
+The validated loader finds the counts in Table~\ref{tab:local_counts}. Mask files are excluded from the image count; BUSI is retained for provenance context but excluded from validated training.
 
 \begin{table}[htbp]
 \centering
-\caption{Images found in the supplied local folders. These are directory counts, not an audited cohort.}
+\caption{Images in the repaired validated local folders. BUSI is excluded because its patient identifiers are unavailable.}
 \label{tab:local_counts}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 \textbf{Dataset} & \textbf{Training} & \textbf{Validation} & \textbf{Test} & \textbf{Total} \\ \midrule
-BUSI & 100 & 50 & 50 & 200 \\
-OASBUD & 140 & 30 & 30 & 200 \\
-BrEaST & 162 & 27 & 40 & 229 \\ \midrule
-Combined & 402 & 107 & 120 & 629 \\ \bottomrule
+BUSI & -- & -- & -- & -- \\
+OASBUD & 138 & 30 & 30 & 198 \\
+BrEaST & 164 & 33 & 32 & 229 \\ \midrule
+Validated combined & 302 & 63 & 62 & 427 \\ \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Split-integrity audit}
 The read-only audit enumerates eligible image files, derives subject identifiers where the naming convention permits, and records every partition associated with an identifier. For OASBUD it removes the view suffix; for BrEaST it uses the \texttt{caseNNN} prefix. The BUSI files in this local copy were renamed to generated sample identifiers, so patient separation cannot be reconstructed from filenames alone.
 
-An audit passes only when every included dataset has verifiable identifiers and no identifier occurs in more than one partition. The current audit fails: OASBUD subject \texttt{30nh} occurs in training and validation, while BrEaST \texttt{case140} spans training and test and \texttt{case151} spans training and validation. BUSI is additionally marked unverifiable. The training entry point therefore stops by default. An \texttt{--allow-unaudited-data} override exists solely for explicitly provisional engineering runs and is recorded in the checkpoint through the audit status.
+An audit passes only when every included dataset has verifiable identifiers and no identifier occurs in more than one partition. The repaired OASBUD and BrEaST folders pass this check. BUSI remains unverifiable and is excluded from the validated run. The training entry point stops by default if a configured dataset fails; an \texttt{--allow-unaudited-data} override exists solely for explicitly provisional engineering runs and is recorded in the checkpoint through the audit status.
 
-For the final experiment, the supplied \texttt{data\_split.py} utility copies grouped source files into deterministic class-stratified subject partitions and writes a manifest. Copying rather than moving preserves the source dataset. The generated manifest, source checksums, and audit report should be versioned with the run metadata, subject to dataset licensing constraints.
+The \texttt{rebuild\_subject\_splits.py} utility copies grouped source files into deterministic subject partitions and writes a manifest. Copying rather than moving preserves the legacy source dataset. The generated manifest and audit report should be retained with run metadata, subject to dataset licensing constraints.
 
 \section{Preprocessing pipeline}
 All training, evaluation, command-line prediction, and API routes call the same preprocessing implementation. Images are decoded to RGB, optionally enhanced with CLAHE, transformed according to a selected geometric strategy, converted to tensors, and normalised with ImageNet channel statistics for the transfer-learning backbones.

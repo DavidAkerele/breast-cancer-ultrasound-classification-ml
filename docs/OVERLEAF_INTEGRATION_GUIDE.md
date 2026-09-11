@@ -51,7 +51,7 @@ zip -r overleaf_thesis.zip latex/
 ```text
 latex/
 ├── main.tex                  # Master thesis file with MMU template & packages
-├── abstract.tex              # Evidence-aware abstract and provisional result
+├── abstract.tex              # Evidence-aware abstract and local-cohort result
 ├── declaration.tex           # MMU ethics declaration page
 ├── acknowledgements.tex      # Acknowledgements page
 ├── abbreviations.tex         # Abbreviations table

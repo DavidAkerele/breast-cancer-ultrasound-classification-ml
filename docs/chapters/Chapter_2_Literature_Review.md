@@ -33,3 +33,15 @@ Softmax produces a mutually exclusive probability vector but does not guarantee 
 Public datasets such as BUSI and OASBUD make experimentation possible, but subject grouping and provenance determine whether an evaluation is interpretable. A complete evidence record includes source identifiers, grouping rules, checksums, exclusions, split manifest, preprocessing, model configuration, seeds, checkpoints, and per-image predictions.
 
 The research gap addressed here is therefore practical integration: connecting a working classifier and user interface to an auditable evidence chain, while preventing illustrative interface values from being mistaken for measured findings.
+
+## 2.6 Public breast-ultrasound datasets
+
+The revised dissertation reviews five datasets discussed by Bristow and Yap: OASBUD, RODTOOK, UDIAT, BUSI, and BrEaST. They differ in country, scanner source, image formation, annotation, ground truth, and file organisation. Those differences affect both training and the meaning of a test result.
+
+OASBUD and BrEaST were selected for the validated experiment because their local copies retain subject identifiers, paired lesion masks, and labels linked to biopsy or follow-up evidence. Their contrasting appearance also gives the local experiment some acquisition diversity. The study still has a narrow geographic base because both sources were collected in Poland.
+
+RODTOOK and UDIAT were not in the supplied project data. Bringing them into the present experiment would require a fresh acquisition, licence review, curation pass, and frozen subject-level manifest. They are sensible external cohorts for later work.
+
+BUSI was present only as a renamed 224 by 224 derivative. The generated `sample_*` identifiers cannot be traced back to the original cases, and the visible images show repeated banding. Published correspondence also reports duplicates and inconsistent cases in the public release. The local derivative is therefore illustrated in the report but excluded from validated training and evaluation.
+
+The dataset plate is stored at [`latex_university/figures/fig9_dataset_quality_examples.png`](../../latex_university/figures/fig9_dataset_quality_examples.png). It shows benign and malignant examples from the three local folders while making the BUSI derivative status explicit.

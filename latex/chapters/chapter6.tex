@@ -3,7 +3,7 @@
 \section{Conclusion}
 This dissertation delivers a reproducible research framework for breast-ultrasound image classification with shared preprocessing, multiple convolutional architectures, transparent evaluation artifacts, and a read-only dataset audit. The work establishes that the software can train, evaluate, and serve a research demonstration, while also exposing why reproducibility controls are necessary before reporting biomedical performance.
 
-The supplied dataset copy does not yet support patient-independent or clinical claims. Its known cross-split subjects and missing BUSI provenance mean that the provisional bundled-checkpoint result is an engineering baseline only. Earlier static performance, pseudo-labelling, and noise-resilience values have therefore been withdrawn as empirical conclusions.
+The repaired OASBUD and BrEaST dataset copy supports a subject-level local evaluation, but the missing BUSI provenance and limited cohort size prevent external or clinical claims. The fresh checkpoint result is a local research finding only. Earlier static performance, pseudo-labelling, and noise-resilience values have therefore been withdrawn as empirical conclusions.
 
 \section{Future work}
 The immediate priority is cohort reconstruction: retain original identifiers, group all views from each subject in one partition, and document data licences and exclusions. Next, rerun model selection with fixed seeds and saved configurations, evaluate once on an untouched test partition, and generate every table and figure from saved predictions. External-site evaluation, calibration, error analysis, and prospective human-factors validation are prerequisites for any clinical-development claim.

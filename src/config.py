@@ -7,6 +7,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Dataset directory paths
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ACTIVE_DATASET = os.getenv("ACTIVE_DATASET", "busi")
+# Validated experiments default to datasets whose local subject identifiers are
+# recoverable. BUSI remains available for exploratory work until its source
+# identifier manifest is restored.
+TRAIN_DATASETS = tuple(
+    name.strip().lower()
+    for name in os.getenv("TRAIN_DATASETS", "breast,oasbud").split(",")
+    if name.strip()
+)
 TRAIN_DIR = os.path.join(DATA_DIR, ACTIVE_DATASET, "train")
 VAL_DIR = os.path.join(DATA_DIR, ACTIVE_DATASET, "val")
 TEST_DIR = os.path.join(DATA_DIR, ACTIVE_DATASET, "test")
@@ -22,6 +30,12 @@ MODEL_CHECKPOINT_PATHS = {
     "efficientnet_b0": os.path.join(OUTPUT_DIR, "efficientnet_b0_model.pth"),
     "custom_cnn": os.path.join(OUTPUT_DIR, "custom_cnn_model.pth"),
 }
+# The dissertation's audited evaluation record uses EfficientNet-B0. Keep the
+# generic training checkpoint above for training compatibility, but make the
+# audited checkpoint the default for evaluation, prediction, and the dashboard.
+EVALUATION_CHECKPOINT_PATH = os.getenv(
+    "EVALUATION_CHECKPOINT_PATH", MODEL_CHECKPOINT_PATHS["efficientnet_b0"]
+)
 
 # Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -50,6 +64,9 @@ CLAHE_TILE_GRID_SIZE = (16, 16)
 # Cropping & Resizing Strategy: "roi_crop" (Padded ROI), "center_crop" (Default PyTorch), or "direct_resize" (Anamorphic)
 CROP_STRATEGY = os.getenv("CROP_STRATEGY", "roi_crop")
 ROI_MARGIN_RATIO = 0.20  # 20% margin around localized lesion to preserve acoustic shadowing
+# Low-confidence predictions are surfaced as UNCERTAIN by the API instead of
+# being presented as a forced benign/malignant decision.
+ABSTAIN_CONFIDENCE = float(os.getenv("ABSTAIN_CONFIDENCE", "0.60"))
 
 # Device configuration (auto-detect Apple Silicon MPS, NVIDIA CUDA, or CPU)
 if torch.cuda.is_available():

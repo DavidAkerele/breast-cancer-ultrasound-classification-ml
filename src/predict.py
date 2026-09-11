@@ -55,7 +55,12 @@ def predict_image(image_path, model, transform, device, use_clahe=True):
 def main():
     parser = argparse.ArgumentParser(description="Predict Breast Cancer Ultrasound Class")
     parser.add_argument("--image", type=str, required=True, help="Path to breast ultrasound image file or folder")
-    parser.add_argument("--checkpoint", type=str, default=config.CHECKPOINT_PATH, help="Path to model checkpoint")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=config.EVALUATION_CHECKPOINT_PATH,
+        help="Path to model checkpoint (defaults to the audited EfficientNet-B0 checkpoint)",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.checkpoint):

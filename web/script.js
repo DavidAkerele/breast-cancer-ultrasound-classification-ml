@@ -101,7 +101,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (option) option.disabled = !ready;
             });
             if (health.model_ready) {
-                modelSelect.value = health.model || modelSelect.value;
+                const selectedOption = modelSelect.selectedOptions[0];
+                if (selectedOption?.disabled && health.model) modelSelect.value = health.model;
                 byId("loadedModel").textContent = health.model || "Available";
                 setSystemStatus("Model ready", "ready");
             } else {
@@ -175,6 +176,11 @@ document.addEventListener("DOMContentLoaded", () => {
             byId("metricAccuracy").textContent = Number.isFinite(summary.accuracy) ? `${(summary.accuracy * 100).toFixed(2)}%` : "—";
             byId("metricF1").textContent = Number.isFinite(summary.macro_f1) ? summary.macro_f1.toFixed(4) : "—";
             byId("metricAuc").textContent = Number.isFinite(summary.roc_auc) ? summary.roc_auc.toFixed(4) : "—";
+            const extended = payload.extended_evaluation?.overall || {};
+            byId("metricAveragePrecision").textContent = Number.isFinite(extended.average_precision) ? extended.average_precision.toFixed(4) : "—";
+            byId("metricMalignantRecall").textContent = Number.isFinite(extended.malignant_recall) ? extended.malignant_recall.toFixed(4) : "—";
+            byId("metricEce").textContent = Number.isFinite(extended.expected_calibration_error) ? extended.expected_calibration_error.toFixed(4) : "—";
+            byId("metricBrier").textContent = Number.isFinite(extended.brier_score) ? extended.brier_score.toFixed(4) : "—";
             const generated = metrics.generated_at_utc ? new Date(metrics.generated_at_utc).toLocaleString() : "legacy run timestamp unavailable";
             byId("metricsProvenance").textContent = `${metrics.model_name || "Model"} · ${metrics.split || "test"} split · ${generated} · evidence status: ${metrics.evidence_status || "provisional"}.`;
             const list = byId("unavailableList");
@@ -183,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 li.textContent = item;
                 return li;
             }));
-            [byId("confusionImage"), byId("rocImage")].forEach((image) => {
+            [byId("confusionImage"), byId("rocImage"), byId("diagnosticImage"), byId("sourcePerformanceImage")].forEach((image) => {
                 const base = image.src.split("?")[0];
                 image.src = `${base}?v=${Date.now()}`;
             });
@@ -273,7 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function loadLabelledExample() {
-        const cohort = await fetchJson("/api/dataset/cohort?dataset=busi&split=val&count=1");
+        const cohort = await fetchJson("/api/dataset/cohort?dataset=breast&split=val&count=1");
         if (!cohort.length) throw new Error("No labelled example is available in the selected local folders.");
         const item = cohort[0];
         const response = await fetch(item.url);
@@ -436,7 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
         button.disabled = true;
         button.textContent = "Loading…";
         try {
-            const cohort = await fetchJson("/api/dataset/cohort?dataset=busi&split=test&count=12");
+            const cohort = await fetchJson("/api/dataset/cohort?dataset=oasbud&split=test&count=12");
             const files = await Promise.all(cohort.map(async (item) => {
                 const response = await fetch(item.url);
                 if (!response.ok) throw new Error(`Could not load ${item.name}.`);

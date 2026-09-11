@@ -16,7 +16,7 @@ The project addresses three connected issues:
 2. **Geometric preprocessing:** direct rectangular-to-square resize changes apparent aspect ratios; padding permits isotropic resize, but any predictive benefit must be measured.
 3. **Evidence integrity:** subject identifiers, split manifests, seeds, configuration, checkpoints, and per-image predictions are necessary to support a defensible result.
 
-The supplied local data currently fails the third requirement. Identifiable OASBUD and BrEaST subjects occur across splits, and renamed BUSI files do not preserve enough provenance to verify patient separation. Current metrics are therefore provisional engineering evidence only.
+The supplied OASBUD and BrEaST folders have now been rebuilt into subject-level splits with no cross-partition identifiers. The renamed BUSI files still do not preserve enough provenance to verify patient separation, so BUSI is excluded from validated training and evaluation. Current metrics are local-cohort research evidence only.
 
 ## 1.3 Research questions
 

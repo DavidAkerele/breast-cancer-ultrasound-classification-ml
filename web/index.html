@@ -14,7 +14,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
     <link rel="icon" href="favicon.svg?v=20260907" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css?v=20260907e">
+    <link rel="stylesheet" href="style.css?v=20260910a">
 </head>
 <body>
     <a class="skip-link" href="#mainContent">Skip to workspace</a>
@@ -240,10 +240,18 @@
                         <dl><dt>Macro F1</dt><dd id="metricF1">—</dd></dl>
                         <dl><dt>ROC-AUC</dt><dd id="metricAuc">—</dd></dl>
                     </div>
+                    <div class="metric-row evidence-metrics evidence-secondary">
+                        <dl><dt>Average precision</dt><dd id="metricAveragePrecision">—</dd></dl>
+                        <dl><dt>Malignant recall</dt><dd id="metricMalignantRecall">—</dd></dl>
+                        <dl><dt>Calibration error</dt><dd id="metricEce">—</dd></dl>
+                        <dl><dt>Brier score</dt><dd id="metricBrier">—</dd></dl>
+                    </div>
                     <p class="research-note" id="metricsProvenance">Metrics not loaded.</p>
                     <div class="evidence-figures">
                         <figure><figcaption>Generated confusion matrix</figcaption><img id="confusionImage" src="/api/evidence/confusion_matrix.png" alt="Generated confusion matrix for the provisional checkpoint evaluation"></figure>
                         <figure><figcaption>Generated receiver operating characteristic</figcaption><img id="rocImage" src="/api/evidence/roc_curve.png" alt="Generated ROC curve for the provisional checkpoint evaluation"></figure>
+                        <figure><figcaption>Precision-recall and reliability</figcaption><img id="diagnosticImage" src="/api/evidence/discrimination_calibration.png" alt="Precision-recall curve and reliability diagram generated from the stored test predictions"></figure>
+                        <figure><figcaption>Performance by dataset source</figcaption><img id="sourcePerformanceImage" src="/api/evidence/source_stratified_performance.png" alt="Source-stratified performance for BrEaST and OASBUD test images"></figure>
                     </div>
                     <div class="unavailable-panel"><h3>Not available as measured evidence</h3><ul id="unavailableList"><li>Loading…</li></ul></div>
                 </section>
@@ -251,7 +259,7 @@
                 <section class="view" id="view-dataset" aria-labelledby="datasetHeading" hidden>
                     <div class="section-intro"><div><h2 id="datasetHeading">Local dataset explorer</h2><p>Inspect folder labels and images. Folder membership does not certify subject independence.</p></div></div>
                     <div class="control-band compact">
-                        <label>Dataset<select id="datasetSelect"><option value="busi">BUSI</option><option value="oasbud">OASBUD</option><option value="breast">BrEaST</option></select></label>
+                        <label>Dataset<select id="datasetSelect"><option value="breast">BrEaST</option><option value="oasbud">OASBUD</option><option value="busi">BUSI derivative (excluded)</option></select></label>
                         <label>Partition<select id="splitSelect"><option value="train">Training</option><option value="val">Validation</option><option value="test">Test</option></select></label>
                     </div>
                     <p class="dataset-summary" id="datasetSummary" aria-live="polite"></p>
@@ -259,11 +267,26 @@
                 </section>
 
                 <section class="view" id="view-documentation" aria-labelledby="documentationHeading" hidden>
-                    <div class="section-intro"><div><h2 id="documentationHeading">Documentation reader</h2><p>Submission-facing Markdown and methodology notes served directly from the repository.</p></div></div>
+                    <div class="section-intro"><div><h2 id="documentationHeading">System guide and project record</h2><p>Use boundaries, interface map, literature audit, and submission-facing documentation served from the repository.</p></div></div>
+                    <div class="use-guide" aria-label="Research use guide">
+                        <article class="use-card use-card-positive"><span>Appropriate use</span><h3>Research inspection</h3><ul><li>Reproduce local model outputs</li><li>Inspect preprocessing and Grad-CAM</li><li>Review stored metrics and error cases</li></ul></article>
+                        <article class="use-card use-card-negative"><span>Unsupported use</span><h3>Clinical decisions</h3><ul><li>No diagnosis or patient triage</li><li>No claim of external generalisation</li><li>No interpretation of confidence as disease probability</li></ul></article>
+                        <article class="use-card"><span>Evidence boundary</span><h3>Audited local cohort</h3><ul><li>BrEaST and OASBUD only</li><li>BUSI derivative excluded from validation</li><li>62 held-out images and one training seed</li></ul></article>
+                    </div>
+                    <div class="interface-map" aria-label="Interface map">
+                        <article><strong>01</strong><span>Single image</span><small>Source, processed input and Grad-CAM</small></article>
+                        <article><strong>02</strong><span>Noise</span><small>Seeded demonstration, not a cohort result</small></article>
+                        <article><strong>03</strong><span>Batch</span><small>Labelled examples and CSV export</small></article>
+                        <article><strong>04</strong><span>Evidence</span><small>Audit, metrics and generated plots</small></article>
+                        <article><strong>05</strong><span>Dataset</span><small>Folder inspection with provenance warning</small></article>
+                        <article><strong>06</strong><span>Documents</span><small>Methods, results and citation audits</small></article>
+                    </div>
                     <div class="document-layout">
                         <nav class="document-list" aria-label="Available documents">
                             <button type="button" data-document="DISSERTATION.md">Dissertation summary</button>
                             <button type="button" data-document="RESULTS_STATUS.md">Results status</button>
+                            <button type="button" data-document="MOI_HOON_YAP_LITERATURE_AUDIT.md">Literature audit</button>
+                            <button type="button" data-document="SUPERVISOR_REVISION_CHECKLIST.md">Revision checklist</button>
                             <button type="button" data-document="USER_MANUAL.md">User manual</button>
                             <button type="button" data-document="Chapter_3_Methodology.md">Methodology chapter</button>
                             <button type="button" data-document="TABLE_INTERPRETATION_AND_METHODOLOGY_GUIDE.md">Evidence-table guide</button>
@@ -284,6 +307,6 @@
             <button class="button primary" value="close">Close</button>
         </form>
     </dialog>
-    <script src="script.js?v=20260907c"></script>
+    <script src="script.js?v=20260910a"></script>
 </body>
 </html>

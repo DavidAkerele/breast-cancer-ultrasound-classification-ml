@@ -1,0 +1,22 @@
+\chapter{Product Repository and Access}
+\label{app:product_repository}
+
+The digital product associated with this dissertation is available from the following repository:
+
+\begin{center}
+\large
+\url{https://github.com/DavidAkerele/breast-cancer-ultrasound-classification-ml}
+\end{center}
+
+The repository contains the code for data audit, preprocessing, model training, evaluation, the API, and the browser dashboard. It also contains the stored results, executable notebook, documentation, automated tests, report source, and presentation source. This public repository is the stable product link for assessment.
+
+The local demonstration address is \url{http://localhost:8000}. It works only after the repository has been downloaded and the service has been started.
+
+From the repository root, the product can be checked with the following commands:
+
+\begin{verbatim}
+python -m pytest -q
+uvicorn api:app --host 0.0.0.0 --port 8000
+\end{verbatim}
+
+The implementation is a research demonstration and not a clinical service. Repository access should be tested after upload, and the submitted revision should remain available to the examiners until the end of the assessment period.

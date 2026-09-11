@@ -1,0 +1,23 @@
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+This dissertation delivers a reproducible research framework for breast-ultrasound image classification with shared preprocessing, multiple convolutional architectures, transparent evaluation artifacts, and a read-only dataset audit. The work establishes that the software can train, evaluate, and serve a research demonstration, while also exposing why reproducibility controls are necessary before reporting biomedical performance.
+
+The repaired OASBUD and BrEaST dataset copy supports a subject-level local evaluation, but the missing BUSI provenance and limited cohort size prevent external or clinical claims. The fresh checkpoint result is a local research finding only. Earlier static performance, pseudo-labelling, and noise-resilience values have therefore been withdrawn as empirical conclusions.
+
+\section{Future work}
+The BrEaST and OASBUD cohort now retains subject grouping and passes the local split audit. The immediate priority for a later experiment is to freeze that manifest, keep the untraceable BUSI derivative excluded, and save the complete training history for each predeclared seed. Model selection should use validation data, followed by one evaluation on an untouched test partition and regeneration of every table and figure from saved predictions. External-site evaluation, fitted calibration, expanded error analysis, and prospective human-factors validation are prerequisites for any clinical-development claim.
+
+Future technical work may compare self-supervised pretraining, attention architectures, and domain adaptation, but only after the basic split and provenance controls are in place. The appropriate success criterion is not a headline accuracy alone; it is a transparent, repeatable estimate whose limitations are clear to researchers, clinicians, and patients.
+
+\section{Closing perspective}
+The project shows that a classifier cannot be interpreted in isolation. Its meaning depends on the files used to train it, the subject split, the transformation applied before inference, the display threshold, and the evidence retained after evaluation. Improving one component while leaving the others undocumented produces a more polished system without resolving the central uncertainty.
+
+The repaired MMU-formatted project makes that chain visible. A reader can follow the work from literature and dataset audit through preprocessing, model construction, evaluation, and web presentation. The current numerical result is modest and uncertain, but it is traceable. That is a suitable foundation for a dissertation because it permits a supervisor, examiner, or future researcher to identify exactly what should be changed in the next experiment.
+
+The recommended next milestone is not a claim of clinical readiness. It is a locked, subject-independent, multi-seed evaluation with restored provenance and an external test cohort. If that study supports improvement, the evidence will justify a stronger conclusion. If it does not, the project will still have produced a clear account of the conditions under which the model fails. Both outcomes are more valuable than an unreproducible headline number.
+
+\section{Final submission checklist}
+Before submission, the author should confirm that the ethics identifier and declaration are complete, that the university's required word-count rules have been applied, and that the PDF opens without missing figures or references. The source archive should contain the MMU template files, the chapter sources, the bibliography, figures, and a short compilation README. Generated auxiliary files may be excluded if the submission portal requests source-only content, but the final PDF and the exact source used to create it should be retained.
+
+The technical checklist should confirm that the audit passes for every dataset included in the headline result, that the checkpoint metadata names the same preprocessing used by the evaluator, and that the dashboard does not display withdrawn historical values. The narrative checklist should confirm that every numerical claim can be located in a generated artefact and that clinical limitations appear beside the result they qualify.

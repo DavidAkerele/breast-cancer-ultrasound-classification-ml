@@ -12,7 +12,7 @@ Before training, the pipeline regenerates `outputs/data_audit.json`. A failed au
 
 Evaluation reconstructs the selected model without downloading pretrained weights and loads the checkpoint state. The test loader contains no stochastic augmentation. Per-image outputs are saved before aggregate metrics are calculated so every reported number can be regenerated.
 
-The current bundled checkpoint was produced before the strengthened metadata schema. Its latest evaluation on the unaudited 120-image test folders is reported only as a provisional software-regression result in Chapter 5.
+The current EfficientNet-B0 checkpoint was retrained after rebuilding BrEaST and OASBUD subject-level splits. Its evaluation on the 62-image held-out test partition is reported as local-cohort research evidence in Chapter 5; BUSI is excluded because its source identifiers are unavailable.
 
 ## 4.4 Verification
 

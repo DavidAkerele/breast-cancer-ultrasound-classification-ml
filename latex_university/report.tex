@@ -1,0 +1,79 @@
+% If you aren't doing an MSc, change this line!
+\documentclass[12pt,MSc]{mmuthesis}
+
+\input{command} % this reads in lots of packages etc..
+
+% you may find that a few of your words run off the edge of the page
+% add them to this list with a hyphen in the right place to have
+% them broken appropriately
+\hyphenation{op-tical net-works semi-conduc-tor IEEEtran}
+
+\begin{document}
+
+% Uncomment the following lines to leave out list of figures, tables
+% and copyright until final printing
+% leave this alone - sorry I can't put in the command.tex file.
+%\figurespagefalse
+%\tablespagefalse
+\copyrightfalse 
+
+
+% these four need to be set...
+\title{Breast Cancer Ultrasound Classification Using Machine Learning}
+\author{Akerele David Damilola}
+\studentid{25908322}
+\principaladviser{Moi Hoon Yap}
+\ethicsnumber{92016}
+\declarationsignature{appendix_assets/Akerele_David_signature.png}
+\declarationname{Akerele David Damilola}
+\declarationdate{6 September 2026}
+\dept{Department of Computing and Mathematics}
+\faculty{Science and Engineering}
+\submitdate{September 2026}
+\copyrightyear{2026}
+
+\hypersetup{
+  hidelinks,
+  pdftitle={Breast Cancer Ultrasound Classification Using Machine Learning},
+  pdfauthor={Akerele David Damilola},
+  pdfsubject={MSc dissertation, student ID 25908322}
+}
+
+% you should include the abstract and acknowledgements
+% the abbreviations can be removed if you wish.
+% The declaration is populated with the supplied signature image and date.
+\beforeabstract
+\prefacesection{Abstract}
+\input{abstract}
+\afterabstract
+\prefacesection{Acknowledgements}
+\input{acknowledgements}
+\prefacesection{Abbreviations}
+\input{abbreviations}
+\afterpreface
+
+
+% Now include as many chapters as you want
+\input{chapter1}
+\input{chapter2}
+\input{chapter3}
+\input{chapter4}
+\input{chapter5}
+\input{chapter6}
+
+% The MMU template uses biblatex. This local copy uses the BibTeX-compatible
+% backend so it can compile with the repository's portable Tectonic toolchain;
+% Overleaf may use its normal Biber workflow if preferred.
+\addcontentsline{toc}{chapter}{References}      
+\printbibliography[title=References]
+
+% And however many appendices you want.
+\appendix
+\input{appendix1}
+\input{appendix2}
+\input{appendix3}
+\input{appendix4}
+\input{appendix5}
+
+
+\end{document}

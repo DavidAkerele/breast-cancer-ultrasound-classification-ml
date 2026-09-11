@@ -2,15 +2,15 @@
 
 ## Purpose
 
-This document specifies how to evaluate image resizing, cropping, CLAHE, and synthetic noise without inventing or manually transcribing results. No completed ablation is claimed. The only current measured checkpoint result is recorded in `outputs/metrics.json` and remains provisional because the local cohort fails its subject-level audit.
+This document specifies how to evaluate image resizing, cropping, CLAHE, and synthetic noise without inventing or manually transcribing results. No completed ablation is claimed. The only current measured checkpoint result is recorded in `outputs/metrics.json` and is limited to the repaired local cohort; it is not clinical validation.
 
 ## Preprocessing strategies
 
 The implementation exposes three mutually exclusive geometric strategies:
 
-1. `direct_resize` — resize the full rectangular frame to $224\times224$; simple, but potentially anisotropic.
-2. `center_crop` — crop the largest centred square, then resize; isotropic, but peripheral content can be discarded.
-3. `roi_crop` — use a mask-derived crop when available, otherwise a documented central fallback; add 20% context, reflection-pad to a square, then resize.
+1. `direct_resize`: resize the full rectangular frame to $224\times224$. This is simple, but potentially anisotropic.
+2. `center_crop`: crop the largest centred square, then resize. The geometry is isotropic, but peripheral content can be discarded.
+3. `roi_crop`: use a mask-derived crop when available, otherwise a documented central fallback. Add 20% context, reflection-pad to a square, then resize.
 
 CLAHE is a separate boolean factor. It uses clip limit 2.0 and a $16\times16$ tile grid on LAB luminance.
 
@@ -55,4 +55,4 @@ Each run should save:
 
 ## Current status
 
-The present folders contain known cross-split subjects in OASBUD and BrEaST, and BUSI identifiers are insufficient for patient-level verification. The experiment matrix above is therefore a preregistered analysis plan, not a completed results section.
+The repaired folders contain subject-level OASBUD and BrEaST partitions with no cross-split subjects; BUSI identifiers remain insufficient for patient-level verification and is excluded from validated runs. The experiment matrix above is therefore a preregistered analysis plan, not a completed ablation results section.

@@ -1,0 +1,67 @@
+{
+  "source": "outputs/predictions.csv",
+  "threshold": 0.5,
+  "positive_class": "malignant",
+  "overall": {
+    "samples": 62,
+    "confusion_matrix": [
+      [
+        21,
+        12
+      ],
+      [
+        8,
+        21
+      ]
+    ],
+    "accuracy": 0.6774193548387096,
+    "malignant_precision": 0.6363636363636364,
+    "malignant_recall": 0.7241379310344828,
+    "specificity": 0.6363636363636364,
+    "roc_auc": 0.7419017763845349,
+    "average_precision": 0.6803428683078139,
+    "brier_score": 0.2143823034040171,
+    "expected_calibration_error": 0.0652
+  },
+  "by_source": {
+    "BrEaST": {
+      "samples": 32,
+      "confusion_matrix": [
+        [
+          17,
+          2
+        ],
+        [
+          5,
+          8
+        ]
+      ],
+      "accuracy": 0.78125,
+      "malignant_precision": 0.8,
+      "malignant_recall": 0.6153846153846154,
+      "specificity": 0.8947368421052632,
+      "roc_auc": 0.8259109311740891,
+      "average_precision": 0.7840444100059485
+    },
+    "OASBUD": {
+      "samples": 30,
+      "confusion_matrix": [
+        [
+          4,
+          10
+        ],
+        [
+          3,
+          13
+        ]
+      ],
+      "accuracy": 0.5666666666666667,
+      "malignant_precision": 0.5652173913043478,
+      "malignant_recall": 0.8125,
+      "specificity": 0.2857142857142857,
+      "roc_auc": 0.6785714285714286,
+      "average_precision": 0.6853370964912815
+    }
+  },
+  "interpretation": "Post-hoc diagnostics for the stored EfficientNet-B0 test predictions. No model was retrained and no threshold was selected from the test set."
+}

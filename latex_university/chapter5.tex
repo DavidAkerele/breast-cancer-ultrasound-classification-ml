@@ -1,0 +1,49 @@
+\chapter{Discussion and Critical Reflection}
+
+\section{Interpretation of the current work}
+The project demonstrates an end-to-end research implementation, not a validated clinical classifier. Its technical contribution is the consolidation of preprocessing, model loading, inference, and evaluation into one auditable path. This reduces a common source of irreproducibility: reporting metrics from a pipeline that differs from the deployed preprocessing path.
+
+\section{Data validity and threats to inference}
+The repaired OASBUD and BrEaST cohort has no cross-partition subject identifiers, but it remains a small local cohort. BUSI source identifiers were discarded during file renaming and that dataset is excluded from the validated run. The checkpoint result in Chapter~\ref{ch:results} must therefore not be interpreted as clinical sensitivity, specificity, external generalisation, or comparative superiority.
+
+\section{Preprocessing claims}
+Reflection padding preserves the aspect ratio of the image crop by construction, and CLAHE is implemented as an explicit configurable operation. Neither fact establishes improved diagnostic performance. Such a claim requires matched experiments in which crop strategy and CLAHE are varied while data split, model, seed, and training budget are controlled. The same caution applies to synthetic noise simulations: they are useful visual demonstrations, but require measured prediction-level experiments before they become robustness findings.
+
+\section{Clinical, ethical, and regulatory boundaries}
+The dashboard is a research interface only. Its predictions, heatmaps, morphology heuristics, and image-quality estimates are not clinical assessments and should not influence care. The interface no longer assigns BI-RADS categories or clinical priority. Any future clinical translation would require a locked model, external validation at subject and site level, calibration and human-factors studies, governance for dataset consent and privacy, and an appropriate medical-device regulatory pathway. A confidence score is not an estimate of diagnostic certainty.
+
+\section{Remedial study design}
+The current BrEaST and OASBUD folders have been rebuilt and audited by subject. A later study should preserve the frozen manifest with original identifiers, source dataset, class, image or view, split, and checksum. All architecture, threshold, and preprocessing choices should then be made using training and validation data only. External evaluation should extend the present confidence, calibration, source, and failure-case analyses while recording every exclusion.
+
+\section{Threats to validity}
+Several threats remain even after the split audit. The cohort is assembled from public datasets with different acquisition conditions, label conventions, and mask availability. Combining them can increase diversity, but it can also create a dataset fingerprint that a model uses as a shortcut. A site-aware analysis would be needed to determine whether performance is stable when the source dataset changes. The current test partition is too small to support that conclusion.
+
+Label noise is another concern. Folder labels are treated as reference annotations, yet this dissertation has no access to pathology reports, adjudication records, or the circumstances under which each label was assigned. A mislabelled image affects both training and evaluation. Repeating the experiment cannot remove this uncertainty; it can only estimate behaviour relative to the supplied labels. A future study should document the label source and, where feasible, include independent review.
+
+The preprocessing path can introduce selection effects. Mask-guided crops are available only for images with recognised paired masks, while the fallback crop is used when a mask is missing. If mask availability correlates with dataset source or class, the model may see systematically different input distributions. The audit should therefore report mask coverage by split and class, and an ablation should compare masked and unmasked policies under a common manifest.
+
+\section{Failure analysis as a research activity}
+Failure analysis should be planned before the final test run, not added as an anecdotal gallery afterwards. A useful record contains the image identifier, source dataset, subject group, true class, predicted class, probability, preprocessing configuration, mask status, and a short reviewer note. Sorting by uncertainty identifies borderline cases; sorting by confidence identifies potentially dangerous errors; grouping by source identifies possible domain shift. These views complement the aggregate confusion matrix.
+
+The reviewer should avoid treating a heatmap as an explanation by default. The same image can be transformed through direct resize, centre crop, and square padding to test whether the prediction changes with geometry. If a small border alteration changes the class, the model may be sensitive to preprocessing rather than stable lesion evidence. If brightness or contrast perturbations change a high-confidence prediction, the case belongs in a robustness report. The outcome may be a model improvement, a revised limitation, or a decision to drop a transformation.
+
+\section{Reproducibility and maintainability}
+The project is stronger when the report, notebook, API, and dashboard all read from the same generated artefacts. A manually copied metric is a maintenance risk: it can remain plausible while no longer matching the checkpoint. The current arrangement uses the evaluator as the source of truth for predictions, tables, and figures. New charts should be generated from the CSV or JSON output, and new prose should identify the run that produced a number.
+
+Maintainability also depends on preserving a small interface between modules. Dataset discovery should not know about HTML; the evaluator should not silently change label mapping; and the dashboard should not reimplement preprocessing in JavaScript. This separation makes review easier and reduces the chance that a visual enhancement changes the experiment. It also supports a clean handover to a supervisor or another student, who can run the audit and inspect generated files before trusting the result.
+
+\section{Clinical translation barriers}
+Moving from an academic prototype to clinical research would require more than a larger model. The intended use, target population, acquisition protocol, and acceptable error trade-offs would need to be specified. External validation should include new subjects and, ideally, new sites or devices. Calibration should be checked in the intended population, and the interface should be studied with representative clinicians to identify automation bias, alert fatigue, and misunderstanding of uncertainty.
+
+Governance is equally important. Images and subject identifiers must be handled under relevant consent, privacy, and data-sharing agreements. A model update requires versioning and change control. Any clinical claim would need an appropriate regulatory and institutional review pathway. The current local dashboard deliberately stops short of these functions: it is an educational and research demonstration, not a clinical decision-support product.
+
+\section{Practical recommendations}
+The next iteration should prioritise four actions. First, keep the local BUSI derivative outside all validated claims unless a separately acquired original release can be curated from a versioned manifest. Second, retain the frozen BrEaST and OASBUD subject manifest before further tuning. Third, repeat the architecture and preprocessing comparison across predeclared seeds, with any calibration fitted on validation data. Fourth, regenerate the dissertation, README, notebook, presentation, and dashboard from a run-specific output directory. These actions address the largest sources of uncertainty without requiring a more complex neural architecture.
+
+\section{What a successful next experiment would look like}
+A successful next experiment would begin with an explicit protocol signed off before training. It would define the target label, the eligible subjects, the grouping rule, the mask policy, the preprocessing candidates, the tuning budget, and the primary metrics. The test manifest would then be frozen and stored separately from development artefacts. Model selection would use only the training and validation partitions, with each seed and configuration recorded.
+
+The present report shows both aggregate and case-level evidence. A larger external report should retain the same structure: aggregate tables with confidence intervals and calibration, plus case-level files that let a reviewer trace errors to source images. A qualitative review could then identify recurring artefacts or annotation problems. The review would generate hypotheses, not justify deleting difficult cases after their predictions have been inspected.
+
+\section{Value of a negative or inconclusive result}
+If the corrected experiment shows no meaningful difference between preprocessing choices, that is a useful finding. It would suggest that the visual preference for one transformation is not supported by the measured task under the chosen conditions. If all models perform poorly on an external cohort, that would identify domain shift rather than invalidate the engineering work. A transparent failure can guide data collection, annotation, and study design more effectively than a confident but fragile success.

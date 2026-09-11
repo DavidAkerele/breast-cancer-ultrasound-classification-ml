@@ -1,0 +1,103 @@
+\documentclass[10pt]{article}
+\usepackage[paperheight=22.86cm,paperwidth=15.24cm,
+            left=1.27cm,right=1.27cm,top=1.6cm,bottom=1.6cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[round,authoryear]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\titleformat{\section}{\bfseries\fontsize{12pt}{14pt}\selectfont}{\thesection.}{0.5em}{}
+\setlist{nosep,leftmargin=*}
+\urlstyle{same}
+
+\begin{document}
+
+\begin{center}
+  {\fontsize{14pt}{17pt}\selectfont\bfseries Breast Cancer Ultrasound Classification Using Machine Learning\par}
+  \vspace{0.4\baselineskip}
+  \vspace{0.7\baselineskip}
+  {\bfseries Terms of Reference\par}
+  \vspace{0.8\baselineskip}
+  Akerele David Damilola, Student ID 25908322\par
+  MSc Artificial Intelligence, Manchester Metropolitan University\par
+  Supervisor: Professor Moi Hoon Yap
+\end{center}
+
+\section{Project aim}
+
+This project investigates binary classification of benign and malignant breast lesions in ultrasound images. Its main aim is to build an auditable research workflow that connects data checks, preprocessing, model evaluation, saved predictions, and a web interface. The project treats reproducibility and evidence quality as part of the method rather than as reporting details. This emphasis follows wider concerns about evaluation quality in medical imaging research \citep{Litjens2017,Kelly2019}.
+
+The study uses the locally available BrEaST and OASBUD collections after rebuilding their train, validation, and test partitions at subject level. It compares EfficientNet-B0, ResNet-50, and a custom convolutional neural network under the same local test protocol. The work is a research prototype. It does not make diagnostic, BI-RADS, treatment, or management recommendations.
+
+\section{Research questions}
+
+\begin{enumerate}
+  \item How reliably can the implemented convolutional models distinguish benign from malignant lesions on the audited local BrEaST and OASBUD cohort?
+  \item How do EfficientNet-B0, ResNet-50, and the custom CNN compare when evaluated on the same held-out subject-level partition?
+  \item What do confusion matrices, class-specific metrics, ranking curves, calibration measures, confidence intervals, and image-level errors reveal beyond overall accuracy?
+  \item Can a web interface expose the model workflow and evidence boundary without presenting the prototype as a clinical system?
+\end{enumerate}
+
+\section{Objectives}
+
+\begin{enumerate}
+  \item Record dataset provenance and audit each validated split for subject overlap before model training or evaluation.
+  \item Implement one shared preprocessing contract for training, evaluation, command-line prediction, API inference, and the web interface.
+  \item Compare EfficientNet-B0 \citep{Tan2019}, ResNet-50 \citep{He2016}, and a custom CNN on the same audited test split.
+  \item Save aggregate metrics and one probability record per test image so that figures and post-hoc diagnostics can be regenerated.
+  \item Report uncertainty, calibration, source-specific errors, and limitations alongside the headline scores.
+  \item Produce a reproducible dissertation, executable notebook, documented codebase, presentation, and non-clinical research dashboard.
+\end{enumerate}
+
+\section{Dataset scope and BUSI exclusion}
+
+OASBUD provides breast lesion ultrasound cases with case-level information suitable for a subject-aware reconstruction \citep{Piotrzkowska2017}. BrEaST contributes a second source with identifiers that can also be audited. The two collections therefore support the project's central requirement that all images belonging to one subject remain in a single partition.
+
+The repository also contains a local derivative of the BUSI dataset \citep{AlDhabyani2020}. Those files were renamed to generated identifiers and appear to include processed square derivatives. The original patient mapping and transformation history are unavailable. As a result, this copy cannot support a reproducible check for patient separation, duplicate cases, label conflicts, non-breast content, overlays, or the curation decisions described for the published dataset. Including more images would not compensate for that uncertainty. The local BUSI derivative is therefore excluded from validated training, model selection, evaluation, and dashboard demonstrations. This decision concerns the available copy, not the scientific value of the original BUSI dataset.
+
+\section{Method}
+
+The workflow first runs a deterministic data audit. The shared image pipeline then applies grayscale conversion, configurable contrast enhancement, lesion-mask cropping where a mask is available, a documented fallback crop where it is not, reflected padding to a square, resizing, and normalisation. Training augmentation excludes vertical flips because image depth has acquisition meaning.
+
+The primary evaluation uses the fixed held-out test partition and a decision threshold of 0.5. Accuracy, macro precision, macro recall, macro F1, balanced accuracy, ROC-AUC, and a confusion matrix describe the main result. The preserved probabilities also support average precision, a reliability diagram, Brier score, expected calibration error, bootstrap confidence intervals, and source-specific error analysis. Grad-CAM is used for research inspection rather than as proof of a clinically meaningful explanation \citep{Selvaraju2017}.
+
+The literature review covers breast ultrasound classification, lesion detection, segmentation, region-of-interest design, and dataset construction, including verified work by Professor Moi Hoon Yap and collaborators \citep{Yap2008,Yap2010,Yap2018,Yap2019,Yap2020ROI,Chen2023,Thomas2023}.
+
+\section{Evaluation and claim boundary}
+
+All model comparisons use the same local test partition. Point estimates are accompanied by bootstrap intervals, because a ranking on a small sample does not prove population-level superiority. The existing comparison contains one training seed per architecture. Its summary file does not retain paired per-image predictions for every model, so a paired significance test cannot be reconstructed. The report states this limitation directly.
+
+No new training is required for the submitted revision. The extended analysis is derived from the stored EfficientNet-B0 probabilities. Existing checkpoints retain their selected validation points but not complete epoch histories, so the report does not invent learning curves. Future training code now saves an epoch-by-epoch history for later experiments.
+
+\section{Ethical and professional considerations}
+
+The study uses de-identified public research data and does not recruit participants. Even so, medical image software can cause harm if research results are presented as clinical advice. The API and website therefore display a non-clinical boundary, do not accept decision-making authority, and do not issue management recommendations. Dataset licences, university ethics requirements, and the final ethics reference must be checked by the student before submission. The report records uncertainty, exclusions, and negative findings so that readers can distinguish measured evidence from intended future work.
+
+\section{Activity record}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{p{0.52\linewidth}p{0.18\linewidth}p{0.18\linewidth}}
+\toprule
+\textbf{Work package} & \textbf{Start} & \textbf{Finish} \\
+\midrule
+Scope, ethics planning, and data inventory & May 2026 & June 2026 \\
+Literature review and dataset assessment & May 2026 & September 2026 \\
+Data audit and subject-level reconstruction & June 2026 & August 2026 \\
+Model implementation and evaluation & July 2026 & September 2026 \\
+Dashboard, documentation, and report revision & August 2026 & September 2026 \\
+Final verification and submission packaging & September 2026 & September 2026 \\
+\bottomrule
+\end{tabular}
+\caption{Project activity record. Overlapping periods reflect iterative research and writing.}
+\end{table}
+
+\bibliographystyle{agsm}
+\bibliography{refs}
+
+\end{document}

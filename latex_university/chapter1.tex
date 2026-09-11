@@ -1,0 +1,86 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Background}
+Breast cancer is a major global health burden and was the most commonly diagnosed cancer worldwide in the 2020 GLOBOCAN estimates \citep{Sung2021}. Imaging is central to detection and assessment. Ultrasound is particularly useful as a non-ionising adjunct that can characterise breast tissue and guide procedures, but its appearance varies with acquisition settings, equipment, anatomy, and operator technique \citep{Stavros1995,AlDhabyani2020}. These sources of variation complicate both human interpretation and the development of machine-learning systems.
+
+Convolutional neural networks (CNNs) can learn image representations directly from pixels, and transfer learning can make these models practical when labelled medical datasets are comparatively small \citep{Litjens2017,He2016,Tan2019}. However, strong performance on a curated image split does not by itself establish patient-independent generalisation. Views from the same lesion or subject can be highly correlated, so placing related images in different partitions can inflate an evaluation estimate. Reproducibility therefore depends on data provenance and group-aware partitioning as much as on model architecture.
+
+This dissertation develops a research prototype for binary classification of breast-ultrasound images. The project combines configurable contrast enhancement, aspect-ratio-preserving preprocessing, three CNN backbones, machine-readable evaluation artifacts, a split-integrity audit, and a local web interface. It explicitly separates what the present software demonstrates from what would require a new, audited experiment.
+
+\section{Problem statement}
+Three connected problems motivate the work.
+
+\begin{enumerate}
+    \item \textbf{Image variability.} Speckle, gain, field of view, and resolution vary between images and datasets. Preprocessing must be specified and shared across training, evaluation, and inference rather than reimplemented independently.
+    \item \textbf{Geometric transformation.} Directly resizing a rectangular image to a square uses different horizontal and vertical scale factors. This can alter apparent lesion geometry. Square padding before resizing applies one isotropic scale factor, although any effect on classification must be measured rather than assumed.
+    \item \textbf{Evaluation validity.} Image-level stratification is insufficient when subjects contribute multiple views. An evaluation is interpretable only when subject identifiers, partitions, preprocessing, seeds, checkpoints, and per-image predictions are retained.
+\end{enumerate}
+
+The first audit of the supplied folders exposed the third problem directly: identifiable OASBUD and BrEaST subjects crossed partitions, while renamed BUSI files did not retain enough provenance to verify patient separation. OASBUD and BrEaST were rebuilt deterministically and now pass the subject-level audit. The resulting checkpoint provides a local patient-separated estimate for those two sources. It does not estimate performance at another hospital, in clinical practice, or on the unverified BUSI derivative.
+
+\section{Aim and research questions}
+The aim is to design and critically evaluate a reproducible software framework for breast-ultrasound image classification while maintaining a clear boundary between engineering evidence and clinical claims.
+
+The study is organised around the following questions:
+
+\begin{description}
+    \item[RQ1] Can a single, testable preprocessing and inference path support training, evaluation, command-line prediction, and a web demonstration?
+    \item[RQ2] How should CLAHE and aspect-ratio-preserving square padding be evaluated against simpler preprocessing choices without confounding data partitions, model budgets, or random seeds?
+    \item[RQ3] What conclusions are justified by the current dataset provenance and split audit, and what additional controls are required for wider external evaluation?
+\end{description}
+
+RQ1 is addressed through implementation and regression testing. RQ2 defines a controlled ablation protocol; the present local cohort does not support a comparative conclusion. RQ3 is addressed through the repository audit and the evidence-status analysis in Chapter~\ref{ch:results}.
+
+\section{Objectives}
+The project objectives are to:
+
+\begin{enumerate}
+    \item review ultrasound image formation, speckle, relevant lesion descriptors, CNN transfer learning, and reproducible evaluation;
+    \item provide deterministic, subject-aware data-splitting and read-only audit utilities;
+    \item implement CLAHE and three explicitly selectable geometric preprocessing strategies;
+    \item implement EfficientNet-B0, ResNet-50, and a compact custom CNN using a common binary output contract;
+    \item record training configuration and data-audit status in saved checkpoints;
+    \item generate summary metrics, per-image predictions, a confusion matrix, and an ROC curve from one evaluator;
+    \item expose research-only inference, comparison, and controlled noise demonstrations through a local FastAPI application; and
+    \item keep the dissertation, notebook, documentation, web interface, Word document, and presentation consistent with the same evidence source.
+\end{enumerate}
+
+\section{Contributions}
+The principal contribution is not a claim of diagnostic superiority. It is an evidence-aware implementation that makes common sources of divergence visible and testable. Specifically, the repository now provides:
+
+\begin{itemize}
+    \item a shared preprocessing function and paired-mask discovery for supported dataset naming conventions;
+    \item a training guard that refuses an unaudited cohort unless the user explicitly requests a provisional run;
+    \item evaluation outputs that include audit status, preprocessing configuration, per-image probabilities, and an audit checksum;
+    \item regression tests for preprocessing dimensions, mask discovery, data-status reporting, and the research-only API boundary; and
+    \item synchronized written and visual artifacts that withdraw unsupported historical benchmark claims.
+\end{itemize}
+
+\section{Scope and limitations}
+The software performs binary image classification using 2D B-mode breast-ultrasound images. The configured classes are \texttt{benign} and \texttt{malignant}; images stored in a \texttt{normal} directory are mapped to the non-malignant class, which is a modelling simplification that must be reconsidered in a definitive study. The work does not establish a diagnosis, assign BI-RADS, recommend management, or validate a medical device. Heatmaps, confidence values, morphology descriptors, and image-quality estimates are exploratory model outputs only.
+
+No pseudo-labelling experiment, preprocessing ablation, multi-seed comparison, external-site evaluation, or prospective reader study is claimed as completed. These are appropriate extensions from the audited BrEaST and OASBUD baseline. BUSI should remain outside that work unless a separate original release can be curated with traceable identifiers.
+
+\section{Dissertation structure}
+Chapter~2 reviews the physical and computational background. Chapter~3 defines the data audit, preprocessing, models, training controls, and evaluation protocol. Chapter~4 reports the current executable result and its evidence limitations. Chapter~5 discusses validity, reproducibility, and clinical boundaries. Chapter~6 concludes and specifies the work required for a defensible final experiment.
+
+\section{Rationale for an evidence-aware prototype}
+Ultrasound is attractive for a student research project because it is comparatively accessible, portable, and capable of showing soft-tissue structure without ionising radiation. Those advantages are accompanied by a difficult image-formation problem. The appearance of a lesion is influenced by probe pressure, probe orientation, focal-zone placement, gain, depth, dynamic range, and the operator's decision about what to include in the frame. Two images of the same lesion can therefore be visually different even when the underlying pathology has not changed. Conversely, two images from different patients can share scanner-specific or operator-specific characteristics. A model trained on a small collection may learn either useful lesion evidence or these incidental regularities, and the image alone does not reveal which has happened.
+
+The browser demonstration is only the final step in a chain that begins with file naming and dataset curation. If that chain changes between training and demonstration, the reported result no longer describes one experiment. The project treats the data manifest, preprocessing configuration, checkpoint metadata, and evaluator output as research records because implementation shortcuts can hide the assumptions behind a reported number.
+
+The problem is consequently methodological as well as computational. It is not enough to ask which network produces the largest score on the available folders. The more useful question is whether the score can be traced to a documented population, a defensible partition, and a fixed transformation. This changes the order of work. Dataset inspection precedes model comparison; an audit precedes a headline metric; and an interface label must remain narrower than a clinical conclusion. The dissertation adopts that order deliberately, even when it means reporting a less impressive result than the original project materials suggested.
+
+There is also a communication problem. Medical-image projects often use the language of diagnosis even when the underlying experiment is an image-level classification exercise. Terms such as ``confidence'', ``sensitivity'', and ``robustness'' have specific meanings, and readers may reasonably infer more than the experiment supports if those terms are presented without qualification. The report therefore uses explicit evidence labels: engineering evidence refers to a functioning pipeline, local-cohort evidence refers to the audited test partition, and clinical evidence is not claimed.
+
+The questions are narrower than those of a clinical validation programme. They ask whether the project can produce a trustworthy experimental object and leave treatment decisions outside its scope. This framing makes the work falsifiable. If the audit fails, the result is a documented failure of the proposed evidence path. If two preprocessing choices perform similarly after a controlled comparison, the report should state that outcome instead of presenting a preferred visual transformation as an improvement.
+
+The scope is further limited by the unit of annotation. The labels are inherited from dataset folders rather than adjudicated for this study, and the available images do not provide a complete clinical record, pathology context, acquisition protocol, or reader disagreement measure. The system cannot distinguish a technically poor image from a clinically difficult case in a validated way. Its image-quality heuristics are indicators for inspection, not exclusion rules. Similarly, a saliency map can highlight a plausible region while still being unstable under small perturbations. These limitations are properties of the available evidence rather than defects that can be hidden by a more elaborate interface.
+
+The methodology is a specification of the study design, while the results chapter records what was actually run. The discussion explains why a moderate, auditable result is more informative than a higher historical value that cannot be reproduced. This separation matters because the project includes both research code and a user-facing demonstration. The interface shows what the software can do; the dissertation explains what the evidence means.
+
+\section{Researcher's position and design choices}
+The project was developed as an applied machine-learning study rather than as a clinical trial. That position affects the choice of language and the order of decisions. A clinical trial would begin with a defined intended use, a target population, a prespecified endpoint, and governance approvals. This dissertation begins with an inherited folder of images and asks whether it can be turned into a reproducible experiment without hiding the weaknesses of that starting point. The resulting contribution is therefore partly technical and partly documentary.
+
+Several design choices follow from this position. The system favours explicit configuration over convenience, retains provisional outputs instead of deleting them, and reports limitations next to results. It also keeps a local web demonstration because a working interface exposes assumptions that are easy to miss in a notebook: file-size limits, missing masks, low-confidence predictions, and the difference between a model output and a user-facing label. These choices do not make the classifier clinically reliable, but they make the research object easier to inspect.

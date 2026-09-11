@@ -24,10 +24,10 @@ def code(text):
 def create_notebook():
     cells = [
         markdown("""
-# Breast Ultrasound Classification
-## Reproducible research record
+# Breast Cancer Ultrasound Classification Using Machine Learning
+## Auditable evaluation and research dashboard
 
-This notebook is a thin, executable view of the repository evidence. It does not contain hand-entered benchmark values. The supplied cohort currently fails its subject-level split audit, so every displayed metric is a **provisional engineering result**, not a clinical-performance estimate.
+This notebook is a compact, executable view of the repository evidence. It does not contain hand-entered benchmark values. The validated run uses repaired subject-level BrEaST and OASBUD splits. The local BUSI derivative is excluded because its files were renamed and its patient mapping and transformation history cannot be reconstructed. That prevents a reproducible check for patient separation, duplicate cases, label conflicts, overlays, and other published curation decisions. The exclusion applies to the local derivative, not to the original published BUSI dataset. Metrics are local cohort research evidence, not clinical performance estimates.
         """),
         markdown("""
 ## 1. Environment and project location
@@ -45,11 +45,11 @@ print({"python": sys.version.split()[0], "platform": platform.platform(), "proje
         markdown("""
 ## 2. Audit data integrity
 
-The audit derives subject identifiers where the local filename convention permits and records cross-partition subjects. BUSI is marked unverifiable because the local files were renamed without an original-ID manifest.
+The audit derives subject identifiers where the local filename convention permits and records cross-partition subjects. The validated run audits BrEaST and OASBUD. BUSI is documented as an excluded local derivative because its original identifiers are unavailable.
         """),
         code("""
 subprocess.run(
-    [sys.executable, "scripts/audit_data.py", "--output", "outputs/data_audit.json"],
+    [sys.executable, "scripts/audit_data.py", "--datasets", "breast", "oasbud", "--output", "outputs/data_audit.json"],
     check=True,
 )
 audit = json.loads((ROOT / "outputs/data_audit.json").read_text())
@@ -59,7 +59,7 @@ audit["audit_passed"], audit["failed_datasets"]
 import pandas as pd
 
 rows = []
-for dataset in ("busi", "oasbud", "breast"):
+for dataset in audit["audited_datasets"]:
     for split, labels in audit[dataset]["counts"].items():
         rows.append({"dataset": dataset, "split": split, "images": sum(labels.values())})
 pd.DataFrame(rows).pivot(index="dataset", columns="split", values="images").fillna(0).astype(int)
@@ -77,9 +77,9 @@ else:
     print("Using the committed local evidence files; set RUN_EVALUATION=True to regenerate them.")
         """),
         markdown("""
-## 4. Inspect generated metrics
+## 4. Inspect generated metrics and uncertainty
 
-The following values come from `outputs/metrics.json`. The audit status is shown alongside them so the evidence boundary cannot be separated from the headline numbers.
+The primary values come from `outputs/metrics.json`. Additional threshold and calibration diagnostics come from the preserved per-image probabilities in `outputs/predictions.csv` and are stored in `outputs/extended_evaluation.json`. The audit status is shown alongside them so the evidence boundary remains attached to the headline numbers.
         """),
         code("""
 metrics = json.loads((ROOT / "outputs/metrics.json").read_text())
@@ -93,28 +93,91 @@ print({
 })
         """),
         code("""
+extended = json.loads((ROOT / "outputs/extended_evaluation.json").read_text())
+benchmark = json.loads((ROOT / "outputs/model_benchmark.json").read_text())
+
+overall = extended["overall"]
+pd.Series({
+    "malignant precision": overall["malignant_precision"],
+    "malignant recall": overall["malignant_recall"],
+    "specificity": overall["specificity"],
+    "ROC-AUC": overall["roc_auc"],
+    "average precision": overall["average_precision"],
+    "Brier score": overall["brier_score"],
+    "expected calibration error": overall["expected_calibration_error"],
+}).to_frame("EfficientNet-B0").style.format("{:.4f}")
+        """),
+        code("""
+comparison_rows = []
+for record in benchmark["records"]:
+    result = record["summary"]
+    comparison_rows.append({
+        "model": record["model_name"],
+        "accuracy": result["accuracy"],
+        "macro_f1": result["macro_f1"],
+        "roc_auc": result["roc_auc"],
+        "accuracy_95_ci": tuple(result["bootstrap_95_ci"]["accuracy"]),
+        "roc_auc_95_ci": tuple(result["bootstrap_95_ci"]["roc_auc"]),
+    })
+pd.DataFrame(comparison_rows).set_index("model")
+        """),
+        code("""
 from IPython.display import Image, display
 
 display(Image(filename="outputs/confusion_matrix.png", width=520))
 display(Image(filename="outputs/roc_curve.png", width=520))
+display(Image(filename="outputs/discrimination_calibration.png", width=900))
+display(Image(filename="outputs/source_stratified_performance.png", width=760))
         """),
         markdown("""
-## 5. Interpretation
+## 5. Source-specific error analysis
 
-The current run confirms that the checkpoint, data loader, preprocessing, evaluator, and artifact writers operate together. It does **not** establish patient-independent generalisation because OASBUD and BrEaST subjects cross partitions and BUSI patient separation cannot be verified.
+The fixed 0.5 threshold produces eight false negatives and twelve false positives overall. BrEaST contributes two false positives and five false negatives. OASBUD contributes ten false positives and three false negatives. The subsets differ in source, acquisition, reconstruction, case mix, and sample size, so this descriptive analysis cannot identify a cause or rank dataset quality.
+        """),
+        code("""
+source_rows = []
+for source, result in extended["by_source"].items():
+    tn, fp = result["confusion_matrix"][0]
+    fn, tp = result["confusion_matrix"][1]
+    source_rows.append({
+        "source": source,
+        "n": result["samples"],
+        "accuracy": result["accuracy"],
+        "malignant_precision": result["malignant_precision"],
+        "malignant_recall": result["malignant_recall"],
+        "specificity": result["specificity"],
+        "roc_auc": result["roc_auc"],
+        "false_positives": fp,
+        "false_negatives": fn,
+    })
+pd.DataFrame(source_rows).set_index("source").style.format({
+    "accuracy": "{:.4f}",
+    "malignant_precision": "{:.4f}",
+    "malignant_recall": "{:.4f}",
+    "specificity": "{:.4f}",
+    "roc_auc": "{:.4f}",
+})
+        """),
+        markdown("""
+## 6. Interpretation
 
-A defensible final experiment must recover original identifiers, create a subject-level manifest, freeze the test set before model selection, use predeclared repeated seeds and equal tuning budgets, save every prediction, and regenerate every table and figure from those saved records.
+The current run confirms that the checkpoint, data loader, preprocessing, evaluator, and artifact writers operate together on a patient-separated local cohort. It does **not** establish external or clinical generalisation. The local BUSI derivative remains intentionally excluded from every validated result.
+
+EfficientNet-B0 has the strongest point estimates in the internal comparison, but all three bootstrap intervals overlap. The preserved benchmark contains per-model summaries rather than paired predictions, so a paired significance test cannot be reconstructed. The custom CNN exceeds ResNet-50 in this run, but that result does not establish a breakthrough or population-level superiority.
+
+The existing checkpoints retain only their selected validation points, not complete epoch histories. The report therefore gives those points and does not invent learning curves. Future training runs now save an epoch-by-epoch JSON record. Multi-seed training, expert review of errors, and external validation remain future work and were not performed for this revision.
         """),
         markdown("""
 ## Submission checklist
 
-- [ ] Dataset licences, versions, checksums, exclusions, and label mapping recorded
-- [ ] Every subject and all associated views/masks assigned to one partition
-- [ ] Test manifest frozen before model selection
-- [ ] Seeds, environment, configuration, and checkpoint hashes saved
-- [ ] Per-image predictions retained for every reported run
-- [ ] Uncertainty, calibration, failure cases, and subgroup/site limitations reported
-- [ ] LaTeX, Word, slides, README, notebook, and website regenerated from the final evidence
+- [x] Dataset versions, exclusions, and label mapping recorded
+- [x] Audited subjects remain within one partition for BrEaST and OASBUD
+- [x] BUSI derivative excluded from validated training and evaluation
+- [x] Seeds, configuration, and checkpoint hashes recorded where available
+- [x] Per-image EfficientNet-B0 test predictions retained
+- [x] Uncertainty, calibration, error cases, and source limitations reported
+- [x] LaTeX, slides, README, notebook, and website aligned with the same evidence
+- [ ] Ethics reference confirmed by the student before submission
         """),
     ]
     nb = {

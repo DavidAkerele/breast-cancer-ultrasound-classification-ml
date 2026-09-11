@@ -1,0 +1,101 @@
+\chapter[Software Implementation and Safety]{Software Implementation and Safety Boundary}
+\label{app:app2}
+
+\section{System purpose}
+
+The repository contains a FastAPI service and a browser dashboard for inspecting the dissertation pipeline. The interface accepts a research image, applies the shared preprocessing function, loads a verified checkpoint, and returns the class probabilities with supporting visual and descriptive outputs. It also exposes the stored benchmark and data-audit files used by the report. This makes the implementation easier to inspect during assessment because the evaluator, API, notebook, and figures read from the same evidence bundle.
+
+The application is a research demonstration. It is not registered or evaluated as a medical device, and it does not provide a diagnosis, BI-RADS category, treatment recommendation, referral decision, or clinical priority. A displayed benign or malignant class is the output of the fitted two-class model under the selected preprocessing configuration. The meaning is limited to the labels used during training.
+
+\section{Component map}
+
+Table~\ref{tab:appendix_components} identifies the main implementation files. The separation is intentional: data preparation, model construction, evaluation, and presentation can be inspected without treating the browser interface as the source of experimental truth.
+
+\begin{table}[H]
+\centering
+\caption{Principal software components.}
+\label{tab:appendix_components}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.30\textwidth}X@{}}
+\toprule
+\textbf{Component} & \textbf{Responsibility} \\
+\midrule
+\path{src/dataset.py} & Dataset discovery, mask pairing, CLAHE, crop strategy, square padding, resizing, augmentation, and dataloader construction. \\
+\path{src/models.py} & Factory for EfficientNet-B0, ResNet-50, and the custom four-stage CNN. \\
+\path{src/train.py} & Audit gate, reproducible seed, optimisation loop, validation, early stopping, and checkpoint metadata. \\
+\path{src/evaluate.py} & Locked-checkpoint evaluation, per-image predictions, aggregate metrics, confidence intervals, calibration estimate, confusion matrix, and ROC curve. \\
+\path{src/api.py} & Upload validation, checkpoint registry, single and batch prediction, Grad-CAM, descriptive image heuristics, evidence routes, and research-only response wording. \\
+\path{web/} & Static dashboard, evidence views, comparison controls, and explanatory text. \\
+\path{tests/test_research_pipeline.py} & Regression tests for preprocessing dimensions, masks, evidence status, and safety wording. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Inference request path}
+
+A single-image request follows a defined sequence. First, the API verifies the extension, confirms that the upload is non-empty, and enforces the 20 MB size limit. It decodes the image and rejects unreadable files. A second gate checks minimum dimensions, excessive colour-channel spread, mean saturation, near-white document-like appearance, very low luminance, and insufficient intensity variation. These are simple input heuristics. They can reject obvious colour photographs or blank files, but they cannot certify that an accepted image is a breast ultrasound scan.
+
+The accepted image enters \texttt{preprocess\_image}, which is also used by dataset evaluation and command-line prediction. The caller selects CLAHE and one of three geometric strategies: padded region-of-interest crop, centre crop, or direct resize. The processed image is converted to a tensor and normalised. The API then selects a checkpoint only when the checkpoint metadata names a supported architecture. It reconstructs that architecture, loads the stored parameters, switches to evaluation mode, and computes a softmax probability vector.
+
+The display layer compares the largest softmax score with the configured abstention threshold of 0.60. Scores below that threshold are surfaced as \texttt{UNCERTAIN}. This changes how the interface communicates the result; it does not create a third trained class and does not calibrate the probability. The API therefore returns the raw probabilities and the abstention state separately.
+
+Grad-CAM is calculated from a late convolutional layer selected for each architecture. The resulting heatmap is resized and overlaid on the processed image. The overlay shows which feature-map regions were influential for that forward and backward pass. It is not a lesion segmentation, causal explanation, or validation that the model used medically appropriate evidence. The interface treats it as an inspection aid.
+
+\section{API surface}
+
+Table~\ref{tab:appendix_routes} summarises the routes used by the dashboard. Route names are included to make the implementation demonstrable without copying large code listings into the dissertation.
+
+\begin{table}[H]
+\centering
+\caption{Research API routes exposed by the implementation.}
+\label{tab:appendix_routes}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.25\textwidth}p{0.14\textwidth}X@{}}
+\toprule
+\textbf{Route} & \textbf{Method} & \textbf{Purpose} \\
+\midrule
+\path{/health} & GET & Reports device, class names, checkpoint availability, and service state. \\
+\path{/predict} & POST & Runs one accepted image through a selected verified model and preprocessing configuration. \\
+\path{/predict/compare} & POST & Compares the available trained architectures on the same uploaded image. \\
+\path{/predict/batch} & POST & Processes a controlled batch through the shared inference path. \\
+\path{/api/benchmarks} & GET & Returns the stored internal architecture benchmark. \\
+\path{/api/data-audit} & GET & Returns the stored data-audit record. \\
+\path{/api/evidence/...} & GET & Serves allow-listed evidence files used by the dashboard. \\
+\path{/api/dataset/cohort} & GET & Selects a balanced demonstration cohort from an available dataset split. \\
+\path{/api/noise/simulate} & POST & Applies a seeded synthetic perturbation for research inspection. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The benchmark route reads \path{outputs/model_benchmark.json}; it does not contain a second set of handwritten scores. The data-audit route follows the same rule. This reduces the chance that the website displays values that differ from the submitted report. A future version should add authentication and a stricter origin policy before the service is exposed outside a local research machine. The current permissive CORS setting supports local development and is not a production security configuration.
+
+\section{Image descriptors and uncertainty}
+
+The interface calculates descriptive texture and geometry proxies to support inspection. These include local intensity variation, normalised Laplacian variance, the proportion of pixels that differ strongly from a median-filtered reference, an estimated signal-to-noise ratio, central dark-region localisation, and simple intensity ratios around the selected region. The names shown to the user describe measured image statistics. They do not identify scanner faults, pathology, lesion margins, posterior acoustic behaviour, or other clinical findings.
+
+The distinction matters because a deterministic formula can still have an invalid interpretation. For example, the localisation routine searches a central region for a dark structure after smoothing and thresholding. When it cannot find a clear peak, it falls back to the image centre. That behaviour keeps the demonstration executable, but it is not a validated lesion detector. The research report returned by the API therefore labels these outputs as heuristics and states that no clinical action may be inferred.
+
+\section{Verification checklist}
+
+The following checks are appropriate before demonstrating or submitting the implementation:
+
+\begin{enumerate}
+    \item Run the subject-level audit and confirm that the selected datasets pass.
+    \item Confirm that the checkpoint architecture matches the metadata and that no random-weight fallback is exposed.
+    \item Run the automated tests and retain the output with the project record.
+    \item Start the local service and check that \path{/health} reports a ready model.
+    \item Submit one valid research image and confirm that preprocessing settings, probabilities, abstention state, and model name are returned.
+    \item Submit an empty file, an unsupported extension, and an obvious colour photograph to verify controlled rejection.
+    \item Compare the dashboard values with the generated model benchmark JSON file.
+    \item Confirm that the interface contains the research-use warning and gives no diagnosis or treatment advice.
+\end{enumerate}
+
+At the time of this report, six automated tests pass. They cover important preprocessing, evidence-boundary, and stored-result contracts but do not exercise every API route or browser interaction. A stronger verification suite would add endpoint tests, corrupted-checkpoint tests, file-size boundary cases, malformed-image inputs, deterministic preprocessing snapshots, and an end-to-end browser test that compares displayed metrics with the JSON evidence.
+
+\section{Known limitations and recommended development}
+
+The domain gate is heuristic and can produce both false acceptance and false rejection. A grayscale image from another modality may pass, while a valid ultrasound frame containing colour Doppler or annotations may fail. A dedicated modality and anatomy classifier would require its own labelled training data, independent evaluation, and failure analysis. Until that work is completed, the gate should be described as an obvious-input filter.
+
+The current dashboard runs locally and loads checkpoints from disk. It has no user authentication, audit trail for individual requests, encrypted clinical storage, retention policy, or role-based access control. Those omissions are acceptable for a local demonstration using permitted research data, but they preclude clinical deployment. Any move beyond the dissertation environment would require information-governance review, security testing, monitoring, version control for models and preprocessing, and an approved process for reporting failures.
+
+The next scientific step is separate from interface polish. The models should be trained across predeclared seeds, tuned with equal budgets, and evaluated on a larger external subject cohort. Threshold selection and calibration must use validation data only. A later reader study could examine whether the interface helps or distracts trained users, but such a study would require an approved protocol and should not be inferred from the present software demonstration.

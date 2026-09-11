@@ -17,17 +17,19 @@ Open `http://localhost:8000`. The static interface is served by FastAPI; there i
 Run the audit before any training or reporting:
 
 ```bash
-venv/bin/python scripts/audit_data.py --output outputs/data_audit.json
+venv/bin/python scripts/audit_data.py --datasets breast oasbud --output outputs/data_audit.json
 venv/bin/python evaluate.py --split test
 ```
 
-The evaluator creates `outputs/metrics.json`, `predictions.csv`, `confusion_matrix.png`, and `roc_curve.png`. Do not enter hand-calculated or illustrative values into reports. The current data audit fails patient-level split validation; its metrics are provisional only.
+The evaluator creates `outputs/metrics.json`, `predictions.csv`, `confusion_matrix.png`, and `roc_curve.png`. Do not enter hand-calculated or illustrative values into reports. The validated run uses the repaired BrEaST and OASBUD subject-level splits. The local BUSI derivative remains excluded because its provenance cannot support the required patient-level audit.
 
 Training stops after a failed audit. `--allow-unaudited-data` is available only for a clearly labelled engineering run; it does not make the resulting checkpoint valid for reporting.
 
 ## Input handling
 
 The API accepts PNG, JPEG, and TIFF uploads up to 20 MB. It applies the selected preprocessing path and may produce a model confidence and saliency visualisation. These outputs are technical aids only. They do not identify a lesion, establish morphology, or replace a clinician.
+
+Predictions below the configured confidence threshold are surfaced as `UNCERTAIN` rather than forced into a benign/malignant label. This is a safety-oriented abstention rule, not a validated uncertainty estimate; calibrate it on a larger held-out cohort before relying on it.
 
 ## Code map
 

@@ -148,14 +148,3 @@ Validated training uses BrEaST and OASBUD by default through `TRAIN_DATASETS=bre
 ```bash
 venv/bin/python train.py --model efficientnet_b0 --epochs 25 --seed 42 --allow-unaudited-data
 ```
-
-## Before submission
-
-1. Confirm the report states that BUSI is excluded from the validated cohort and makes no claim based on its derivative files.
-2. Verify every final numerical claim against `outputs/metrics.json`, `outputs/predictions.csv`, and `outputs/extended_evaluation.json`.
-3. Confirm that the PDF contains the confusion matrix, ROC curve, precision-recall and calibration plot, source analysis, and correct and incorrect prediction examples.
-4. Run the tests and inspect the compiled PDF for missing references, overflow, broken figures, and repeated pages.
-5. Verify that the embedded EthOS email, reference number 92016, signed declaration, and project scope/title match the approval record.
-6. Use the university naming convention `Akerele_David_25908322_Dissertation.pdf` and `Akerele_David_25908322_Presentation.pdf` for the Moodle uploads.
-
-The completed checkpoints retain only the selected epoch, validation loss, and validation accuracy. They do not contain enough information to reconstruct full learning curves. The training program now records every epoch for future runs, but the report does not fabricate a historical curve.
